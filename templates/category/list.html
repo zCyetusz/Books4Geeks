@@ -44,6 +44,7 @@ List {% endblock title %} {% block content %}
                   <tr>
                     <th>ID</th>
                     <th>Name</th>
+                    <th>Description</th>
                     <th>Last Modified</th>
                     <th>Actions</th>
                   </tr>
@@ -53,6 +54,7 @@ List {% endblock title %} {% block content %}
                   <tr>
                     <td>{{ category.id }}</td>
                     <td>{{ category.catname }}</td>
+                    <td>{{ category.description }}</td>
                     <td>{{ category.lastmodified }}</td>
                     <td>
                       <a

@@ -44,6 +44,7 @@ List {% endblock title %} {% block content %}
                   <tr>
                     <th>ID</th>
                     <th>Name</th>
+                    <th>Description</th>
                     <th>Last Modified</th>
                     <th>Actions</th>
                   </tr>
@@ -53,6 +54,7 @@ List {% endblock title %} {% block content %}
                   <tr>
                     <td>{{ publisher.id }}</td>
                     <td>{{ publisher.pubname }}</td>
+                    <td>{{ publisher.description }}</td>
                     <td>{{ publisher.lastmodified }}</td>
                     <td>
                       <a

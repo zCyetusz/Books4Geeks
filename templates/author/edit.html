@@ -47,6 +47,18 @@ Author {% endblock title %} {% block content %}
                     required
                   />
                 </div>
+                <div class="form-group">
+                  <label for="description">Description</label>
+                  <textarea
+                    class="form-control"
+                    id="description"
+                    name="description"
+                    rows="3"
+                    placeholder="Enter author biography or description"
+                  >
+{{ author.description }}</textarea
+                  >
+                </div>
                 <button type="submit" class="btn btn-primary">Update</button>
                 <a href="{% url 'author_list' %}" class="btn btn-secondary"
                   >Cancel</a

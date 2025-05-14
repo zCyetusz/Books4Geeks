@@ -13,6 +13,11 @@ from io import BytesIO
 from django.core.files import File
 import os
 from django.contrib.auth import views as auth_views
+import json
+import requests
+from django.views.decorators.csrf import csrf_exempt
+import google.generativeai as genai
+from django.db.models import Count
 
 # Create your views here.
 
@@ -148,7 +153,11 @@ def publisher_list(request):
 def publisher_create(request):
     if request.method == 'POST':
         pubname = request.POST.get('pubname')
-        Publishers.objects.create(pubname=pubname)
+        description = request.POST.get('description')
+        Publishers.objects.create(
+            pubname=pubname,
+            description=description
+        )
         messages.success(request, 'Publisher created successfully!')
         return redirect('publisher_list')
     
@@ -165,6 +174,7 @@ def publisher_edit(request, pk):
     publisher = get_object_or_404(Publishers, pk=pk)
     if request.method == 'POST':
         publisher.pubname = request.POST.get('pubname')
+        publisher.description = request.POST.get('description')
         publisher.save()
         messages.success(request, 'Publisher updated successfully!')
         return redirect('publisher_list')
@@ -200,7 +210,11 @@ def category_list(request):
 def category_create(request):
     if request.method == 'POST':
         catname = request.POST.get('catname')
-        Categories.objects.create(catname=catname)
+        description = request.POST.get('description')
+        Categories.objects.create(
+            catname=catname,
+            description=description
+        )
         messages.success(request, 'Category created successfully!')
         return redirect('category_list')
     
@@ -217,6 +231,7 @@ def category_edit(request, pk):
     category = get_object_or_404(Categories, pk=pk)
     if request.method == 'POST':
         category.catname = request.POST.get('catname')
+        category.description = request.POST.get('description')
         category.save()
         messages.success(request, 'Category updated successfully!')
         return redirect('category_list')
@@ -252,7 +267,11 @@ def author_list(request):
 def author_create(request):
     if request.method == 'POST':
         authorname = request.POST.get('authorname')
-        Authors.objects.create(authorname=authorname)
+        description = request.POST.get('description')
+        Authors.objects.create(
+            authorname=authorname,
+            description=description
+        )
         messages.success(request, 'Author created successfully!')
         return redirect('author_list')
     
@@ -269,6 +288,7 @@ def author_edit(request, pk):
     author = get_object_or_404(Authors, pk=pk)
     if request.method == 'POST':
         author.authorname = request.POST.get('authorname')
+        author.description = request.POST.get('description')
         author.save()
         messages.success(request, 'Author updated successfully!')
         return redirect('author_list')
@@ -619,3 +639,300 @@ def get_book_by_barcode(request, barcode_number):
         return JsonResponse(data)
     except Books.DoesNotExist:
         return JsonResponse({'error': 'Book not found'}, status=404)
+
+# Helper function to get database information
+def get_database_context():
+    """
+    Retrieves summary data from the database to provide as context to Gemini
+    """
+    try:
+        context = []
+        
+        # Get total counts from different models
+        publisher_count = Publishers.objects.count()
+        category_count = Categories.objects.count()
+        author_count = Authors.objects.count()
+        book_count = Books.objects.count() if 'Books' in globals() else 0
+        
+        context.append(f"Current database summary: {publisher_count} publishers, {category_count} categories, {author_count} authors, and {book_count} books.")
+        
+        # Get recent publishers with full information
+        recent_publishers = Publishers.objects.order_by('-lastmodified')[:5]
+        if recent_publishers:
+            publisher_info = []
+            for p in recent_publishers:
+                pub_desc = p.description if p.description else "No description available"
+                publisher_info.append(f"{p.pubname} (ID: {p.id}) - {pub_desc}")
+            
+            context.append("Recent publishers:")
+            context.extend([f"- {info}" for info in publisher_info])
+        
+        # Get recent categories with full information
+        recent_categories = Categories.objects.order_by('-lastmodified')[:5]
+        if recent_categories:
+            category_info = []
+            for c in recent_categories:
+                cat_desc = c.description if c.description else "No description available"
+                category_info.append(f"{c.catname} (ID: {c.id}) - {cat_desc}")
+            
+            context.append("Recent categories:")
+            context.extend([f"- {info}" for info in category_info])
+        
+        # Get recent authors with full information
+        recent_authors = Authors.objects.order_by('-lastmodified')[:5]
+        if recent_authors:
+            author_info = []
+            for a in recent_authors:
+                auth_desc = a.description if a.description else "No description available"
+                author_info.append(f"{a.authorname} (ID: {a.id}) - {auth_desc}")
+            
+            context.append("Recent authors:")
+            context.extend([f"- {info}" for info in author_info])
+        
+        return "\n".join(context)
+    except Exception as e:
+        return f"Error retrieving database context: {str(e)}"
+
+# Helper function to handle specific database queries
+def handle_db_query(query):
+    """
+    Handles specific database queries based on the user's message
+    Returns structured data that can be used to answer the query
+    """
+    query = query.lower()
+    response = {}
+    
+    try:
+        # Query for publishers
+        if "publishers" in query or "publisher" in query:
+            if "list" in query or "all" in query:
+                publishers = Publishers.objects.all()
+                response["publishers"] = [
+                    {
+                        "id": p.id,
+                        "name": p.pubname,
+                        "description": p.description or "No description available", 
+                        "last_modified": p.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if p.lastmodified else "Unknown"
+                    } 
+                    for p in publishers
+                ]
+                
+        # Query for categories
+        if "categories" in query or "category" in query:
+            if "list" in query or "all" in query:
+                categories = Categories.objects.all()
+                response["categories"] = [
+                    {
+                        "id": c.id,
+                        "name": c.catname,
+                        "description": c.description or "No description available",
+                        "last_modified": c.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if c.lastmodified else "Unknown"
+                    } 
+                    for c in categories
+                ]
+                
+        # Query for authors
+        if "authors" in query or "author" in query:
+            if "list" in query or "all" in query:
+                authors = Authors.objects.all()
+                response["authors"] = [
+                    {
+                        "id": a.id,
+                        "name": a.authorname,
+                        "description": a.description or "No description available",
+                        "last_modified": a.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if a.lastmodified else "Unknown"
+                    } 
+                    for a in authors
+                ]
+        
+        # Query for books
+        if "books" in query or "book" in query:
+            if "list" in query or "all" in query:
+                books = Books.objects.all()
+                response["books"] = [
+                    {
+                        "id": b.id, 
+                        "description": b.description or "No description available", 
+                        "price": b.price,
+                        "publisher": b.id_pub.pubname if b.id_pub else "Unknown publisher",
+                        "publish_date": b.publishdate.strftime("%Y-%m-%d") if b.publishdate else "Unknown"
+                    } 
+                    for b in books
+                ]
+        
+        return response
+    except Exception as e:
+        return {"error": str(e)}
+
+# Function to execute custom database queries
+def execute_custom_query(query):
+    """
+    Executes more complex database queries based on user intent
+    Returns detailed information that can be used by Gemini to provide more accurate answers
+    """
+    query = query.lower()
+    response = {}
+    
+    try:
+        # Find books by a specific publisher
+        if any(x in query for x in ["books by publisher", "publisher's books"]):
+            # Extract publisher name from query (simplified approach)
+            publisher_matches = [pub.pubname for pub in Publishers.objects.all() 
+                               if pub.pubname and pub.pubname.lower() in query]
+            
+            if publisher_matches:
+                publisher_name = publisher_matches[0]
+                publisher = Publishers.objects.filter(pubname__icontains=publisher_name).first()
+                if publisher:
+                    books = Books.objects.filter(id_pub=publisher)
+                    response["publisher_books"] = {
+                        "publisher": {
+                            "id": publisher.id,
+                            "name": publisher.pubname,
+                            "description": publisher.description or "No description available",
+                            "last_modified": publisher.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if publisher.lastmodified else "Unknown"
+                        },
+                        "books": [
+                            {
+                                "id": b.id, 
+                                "description": b.description or "No description available", 
+                                "price": b.price,
+                                "publish_date": b.publishdate.strftime("%Y-%m-%d") if b.publishdate else "Unknown"
+                            } 
+                            for b in books
+                        ]
+                    }
+        
+        # Find books by a specific author
+        if any(x in query for x in ["books by author", "author's books"]):
+            # Extract author name from query (simplified approach)
+            author_matches = [auth.authorname for auth in Authors.objects.all() 
+                            if auth.authorname and auth.authorname.lower() in query]
+            
+            if author_matches:
+                author_name = author_matches[0]
+                author = Authors.objects.filter(authorname__icontains=author_name).first()
+                if author:
+                    book_authors = Bookauthors.objects.filter(id_author=author)
+                    books = [ba.id_book for ba in book_authors]
+                    response["author_books"] = {
+                        "author": {
+                            "id": author.id,
+                            "name": author.authorname,
+                            "description": author.description or "No description available",
+                            "last_modified": author.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if author.lastmodified else "Unknown"
+                        },
+                        "books": [
+                            {
+                                "id": b.id, 
+                                "description": b.description or "No description available", 
+                                "price": b.price,
+                                "publisher": b.id_pub.pubname if hasattr(b, 'id_pub') and b.id_pub else "Unknown publisher",
+                                "publish_date": b.publishdate.strftime("%Y-%m-%d") if b.publishdate else "Unknown"
+                            } 
+                            for b in books
+                        ]
+                    }
+        
+        # Find books by category
+        if any(x in query for x in ["books in category", "category books"]):
+            # Extract category name from query (simplified approach)
+            category_matches = [cat.catname for cat in Categories.objects.all() 
+                             if cat.catname and cat.catname.lower() in query]
+            
+            if category_matches:
+                category_name = category_matches[0]
+                category = Categories.objects.filter(catname__icontains=category_name).first()
+                if category:
+                    book_categories = Bookcategories.objects.filter(id_cat=category)
+                    books = [bc.id_book for bc in book_categories]
+                    response["category_books"] = {
+                        "category": {
+                            "id": category.id,
+                            "name": category.catname,
+                            "description": category.description or "No description available",
+                            "last_modified": category.lastmodified.strftime("%Y-%m-%d %H:%M:%S") if category.lastmodified else "Unknown"
+                        },
+                        "books": [
+                            {
+                                "id": b.id, 
+                                "description": b.description or "No description available", 
+                                "price": b.price,
+                                "publisher": b.id_pub.pubname if hasattr(b, 'id_pub') and b.id_pub else "Unknown publisher",
+                                "publish_date": b.publishdate.strftime("%Y-%m-%d") if b.publishdate else "Unknown"
+                            } 
+                            for b in books
+                        ]
+                    }
+                    
+        # Add more custom queries as needed
+        
+        return response
+    except Exception as e:
+        return {"error": str(e)}
+
+@csrf_exempt
+def gemini_api(request):
+    """
+    View to handle Gemini API requests from the chatbot using the official Google genai client
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_message = data.get('message', '')
+            
+            # Configure the Gemini API
+            api_key = "AIzaSyCU0QEQYbgD5k44SC5D5J_A1RYVa_CQQ1M"
+            genai.configure(api_key=api_key)
+            
+            # Create context about the Books4Geeks application
+            system_prompt = "You are an AI assistant for the Books4Geeks application, a Django web app for managing books, authors, publishers, and categories. Keep responses helpful, concise, and focused on the application's features. The application has sections for Books, Authors, Publishers, Categories, and user management."
+            
+            # Add database context
+            db_context = get_database_context()
+            system_prompt += f"\n\nHere is the current database information that you should use to answer questions:\n{db_context}"
+            
+            # Check if the query is asking for specific database information
+            specific_data = handle_db_query(user_message)
+            if specific_data and len(specific_data) > 0:
+                system_prompt += f"\n\nThe user is asking about database records. Here is specific data related to their query: {json.dumps(specific_data)}"
+            
+            # Execute custom query for more complex questions
+            custom_data = execute_custom_query(user_message)
+            if custom_data and len(custom_data) > 0:
+                system_prompt += f"\n\nHere is detailed information related to the user's specific query: {json.dumps(custom_data)}"
+            
+            # Log what we're sending to Gemini
+            print(f"System prompt with database context: {system_prompt}")
+            
+            # Access the model and configure it
+            model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash",
+                system_instruction=system_prompt,
+                generation_config={
+                    "temperature": 0.7,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 1024,
+                }
+            )
+            
+            # Generate content
+            response = model.generate_content(user_message)
+            
+            # Check if the response has text
+            if hasattr(response, 'text'):
+                return JsonResponse({'response': response.text})
+            else:
+                return JsonResponse({
+                    'response': 'Sorry, I could not generate a response at this time.',
+                    'error': 'Invalid response structure'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'response': 'Sorry, an error occurred while processing your request.',
+                'error': str(e)
+            })
+    
+    return JsonResponse({'error': 'Only POST requests are allowed'})

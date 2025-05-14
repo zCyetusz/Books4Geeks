@@ -8,6 +8,9 @@ urlpatterns = [
     path('dashboard-v2/', views.index2, name='dashboardv2'),
     path('dashboard-v3/', views.index3, name='dashboardv3'),
 
+    # API endpoints
+    path('api/gemini/', views.gemini_api, name='gemini_api'),
+
     # Authentication
     path('accounts/register/', views.register, name='register'),
     path('accounts/login/', views.UserLoginView.as_view(), name='login'),

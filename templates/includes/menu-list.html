@@ -901,9 +901,60 @@
           <p>Authors</p>
         </a>
       </li>
+      <li class="nav-item">
+        {% comment %}
+        <a href="{% url 'book_list' %}" class="nav-link ajax-link">
+          {% endcomment %}
+          <i class="far fa-circle nav-icon"></i>
+          <p>Books</p>
+        </a>
+      </li>
     </ul>
   </li>
-
+  <!-- Book Management Section -->
+  <li class="nav-item">
+    <a href="#" class="nav-link">
+      <i class="nav-icon fas fa-book"></i>
+      <p>
+        BookShelves
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        {% comment %}
+        <a href="{% url 'area_list' %}" class="nav-link ajax-link">
+          {% endcomment %}
+          <i class="far fa-circle nav-icon"></i>
+          <p>Areas</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        {% comment %}
+        <a href="{% url 'shelves_list' %}" class="nav-link ajax-link">
+          {% endcomment %}
+          <i class="far fa-circle nav-icon"></i>
+          <p>Shelves</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        {% comment %}
+        <a href="{% url 'assign_list' %}" class="nav-link ajax-link">
+          {% endcomment %}
+          <i class="far fa-circle nav-icon"></i>
+          <p>Assign Book to Shelves</p>
+        </a>
+      </li>
+    </ul>
+  </li>
+  <li class="nav-item">
+    {% comment %}
+    <a href="{% url 'reservation_list' %}" class="nav-link ajax-link">
+      {% endcomment %}
+      <i class="far fa-circle nav-icon"></i>
+      <p>Reservations</p>
+    </a>
+  </li>
   <li class="nav-item">
     <a href="{% url 'logout' %}" class="nav-link direct-link">
       <i class="fa fa-sign-out-alt nav-icon"></i>
@@ -924,4 +975,441 @@
     </a>
   </li>
   {% endif %}
+
+  <!-- AI Chatbot Button -->
+  <li class="nav-item mt-3">
+    <a href="#" class="nav-link" id="chatbot-toggle">
+      <i class="nav-icon fas fa-robot"></i>
+      <p>AI Assistant</p>
+    </a>
+  </li>
 </ul>
+
+<!-- Chatbot UI -->
+<div id="chatbot-container" class="chatbot-container" style="display: none">
+  <div class="chatbot-header">
+    <h5>AI Assistant</h5>
+    <button id="close-chatbot" class="close-chatbot">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+  <div class="chatbot-messages" id="chatbot-messages">
+    <div class="message bot-message">
+      <div class="message-content">
+        Hello! I'm your AI assistant. How can I help you today?
+      </div>
+    </div>
+    <!-- Database query suggestion buttons -->
+    <div class="message bot-message">
+      <div class="message-content">
+        Here are some things you can ask me:
+        <div class="query-suggestions">
+          <button
+            class="query-btn"
+            onclick="suggestQuery('Show me all publishers')"
+          >
+            Show publishers
+          </button>
+          <button
+            class="query-btn"
+            onclick="suggestQuery('List all categories')"
+          >
+            Show categories
+          </button>
+          <button
+            class="query-btn"
+            onclick="suggestQuery('Show me all authors')"
+          >
+            Show authors
+          </button>
+          <button
+            class="query-btn"
+            onclick="suggestQuery('How many books are in the database?')"
+          >
+            Book count
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="chatbot-input">
+    <input
+      type="text"
+      id="user-input"
+      placeholder="Type your message here..."
+      class="form-control"
+    />
+    <button id="send-message" class="btn btn-primary">
+      <i class="fas fa-paper-plane"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Chatbot CSS -->
+<style>
+  /* Fix for chatbot visibility issues */
+  .chatbot-container {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 350px !important;
+    height: 500px !important;
+    background-color: #fff !important;
+    border-radius: 10px !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1) !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    z-index: 9999 !important; /* Much higher z-index to overcome other elements */
+  }
+
+  /* Query suggestion buttons */
+  .query-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+  }
+
+  .query-btn {
+    background-color: #f0f7ff;
+    border: 1px solid #cce5ff;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .query-btn:hover {
+    background-color: #007bff;
+    color: white;
+  }
+
+  /* Rest of your CSS remains the same */
+  .chatbot-container.visible {
+    display: flex !important;
+  }
+
+  .chatbot-header {
+    background-color: #007bff;
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .chatbot-header h5 {
+    margin: 0;
+  }
+
+  .close-chatbot {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+  }
+
+  .chatbot-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .message {
+    margin-bottom: 10px;
+    max-width: 80%;
+  }
+
+  .bot-message {
+    align-self: flex-start;
+  }
+
+  .user-message {
+    align-self: flex-end;
+  }
+
+  .message-content {
+    padding: 10px 15px;
+    border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+
+  .bot-message .message-content {
+    background-color: #f1f0f0;
+  }
+
+  .user-message .message-content {
+    background-color: #007bff;
+    color: white;
+  }
+
+  .chatbot-input {
+    display: flex;
+    padding: 10px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .chatbot-input input {
+    flex: 1;
+    margin-right: 10px;
+  }
+
+  #chatbot-toggle {
+    position: relative;
+  }
+
+  #chatbot-toggle .badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+  }
+</style>
+
+<!-- Chatbot JavaScript - Fixed with better jQuery detection and error handling -->
+<script>
+  // Simplified approach using pure vanilla JavaScript for reliability
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("DOM Content Loaded - Initializing chatbot");
+
+    // Direct DOM references for better performance
+    var chatbotToggle = document.getElementById("chatbot-toggle");
+    var chatbotContainer = document.getElementById("chatbot-container");
+    var closeButton = document.getElementById("close-chatbot");
+    var userInput = document.getElementById("user-input");
+    var sendButton = document.getElementById("send-message");
+    var chatMessages = document.getElementById("chatbot-messages");
+
+    if (!chatbotToggle || !chatbotContainer) {
+      console.error("Critical chatbot elements not found!");
+      console.log("chatbotToggle found:", !!chatbotToggle);
+      console.log("chatbotContainer found:", !!chatbotContainer);
+      return;
+    }
+
+    console.log("All chatbot elements found, attaching event listeners");
+
+    // Suggestion query function
+    window.suggestQuery = function (queryText) {
+      if (!userInput || !chatMessages) return;
+
+      // Set the input text
+      userInput.value = queryText;
+
+      // Trigger send button click
+      sendMessage();
+    };
+
+    // Directly toggle chatbot visibility with inline styles
+    chatbotToggle.addEventListener("click", function (e) {
+      e.preventDefault();
+      console.log("Chatbot toggle clicked");
+
+      // Force proper styles to ensure visibility
+      if (
+        chatbotContainer.style.display === "none" ||
+        chatbotContainer.style.display === ""
+      ) {
+        console.log("Setting chatbot to visible");
+        chatbotContainer.style.display = "flex";
+        chatbotContainer.style.position = "fixed";
+        chatbotContainer.style.zIndex = "9999";
+        // Focus the input field
+        if (userInput) userInput.focus();
+      } else {
+        console.log("Setting chatbot to hidden");
+        chatbotContainer.style.display = "none";
+      }
+    });
+
+    // Close button functionality
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        console.log("Close button clicked");
+        chatbotContainer.style.display = "none";
+      });
+    }
+
+    // Send message functionality
+    function sendMessage() {
+      if (!userInput || !chatMessages) return;
+
+      var message = userInput.value.trim();
+      if (message === "") return;
+
+      console.log("Sending message:", message);
+
+      // Create and append user message
+      var userMessageDiv = document.createElement("div");
+      userMessageDiv.className = "message user-message";
+      userMessageDiv.innerHTML =
+        '<div class="message-content">' + message + "</div>";
+      chatMessages.appendChild(userMessageDiv);
+
+      // Clear input
+      userInput.value = "";
+
+      // Scroll to bottom
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // Add loading indicator
+      var loadingDiv = document.createElement("div");
+      loadingDiv.className = "message bot-message";
+      loadingDiv.id = "loading-message";
+      loadingDiv.innerHTML =
+        '<div class="message-content">Typing<span class="typing-dots">...</span></div>';
+      chatMessages.appendChild(loadingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      // Use Gemini API instead of local response simulator
+      fetchGeminiResponse(message)
+        .then(function (botResponse) {
+          // Remove loading indicator
+          var loadingMessage = document.getElementById("loading-message");
+          if (loadingMessage) chatMessages.removeChild(loadingMessage);
+
+          // Create and append bot response
+          var botMessageDiv = document.createElement("div");
+          botMessageDiv.className = "message bot-message";
+          botMessageDiv.innerHTML =
+            '<div class="message-content">' + botResponse + "</div>";
+          chatMessages.appendChild(botMessageDiv);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        })
+        .catch(function (error) {
+          console.error("Error getting Gemini response:", error);
+
+          // Remove loading indicator
+          var loadingMessage = document.getElementById("loading-message");
+          if (loadingMessage) chatMessages.removeChild(loadingMessage);
+
+          // Show error message
+          var errorMessageDiv = document.createElement("div");
+          errorMessageDiv.className = "message bot-message";
+          errorMessageDiv.innerHTML =
+            '<div class="message-content">Sorry, I encountered an error. Please try again later.</div>';
+          chatMessages.appendChild(errorMessageDiv);
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    }
+
+    // Gemini API integration (using server-side implementation)
+    async function fetchGeminiResponse(userMessage) {
+      try {
+        console.log("Sending message to server-side Gemini API:", userMessage);
+
+        // Call our Django endpoint instead of the Gemini API directly
+        const response = await fetch("/api/gemini/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: userMessage,
+          }),
+        });
+
+        console.log("Received response status:", response.status);
+
+        // Parse the response
+        const data = await response.json();
+        console.log("Server response:", data);
+
+        if (data.error) {
+          console.error("Error from server:", data.error);
+          return simulateBotResponse(userMessage); // Fall back to local responses on error
+        }
+
+        return (
+          data.response ||
+          "I'm sorry, I couldn't process your request at this time."
+        );
+      } catch (error) {
+        console.error("Error calling server-side Gemini API:", error.message);
+        console.error("Full error:", error);
+        return simulateBotResponse(userMessage); // Fall back to local responses if API fails
+      }
+    }
+
+    // Simple response simulator (fallback if API fails)
+    function simulateBotResponse(userInput) {
+      userInput = userInput.toLowerCase();
+
+      if (userInput.includes("hello") || userInput.includes("hi")) {
+        return "Hello! How can I assist you with Books4Geeks today?";
+      } else if (userInput.includes("book") || userInput.includes("books")) {
+        return "Our system has a wide selection of books. You can browse by category, author, or publisher using the sidebar menu.";
+      } else if (userInput.includes("author")) {
+        return "You can manage authors in the Book Management > Authors section.";
+      } else if (
+        userInput.includes("category") ||
+        userInput.includes("categories")
+      ) {
+        return "Categories can be managed in the Book Management > Categories section.";
+      } else if (
+        userInput.includes("publisher") ||
+        userInput.includes("publishers")
+      ) {
+        return "Publishers can be managed in the Book Management > Publishers section.";
+      } else if (userInput.includes("help")) {
+        return "I can help you navigate the Books4Geeks system. Try asking about books, authors, categories, or publishers.";
+      } else if (userInput.includes("thank")) {
+        return "You're welcome! Is there anything else you'd like to know?";
+      } else {
+        return "I'm not sure I understand. Could you try rephrasing your question? You can ask about books, authors, categories, or publishers.";
+      }
+    }
+
+    // Attach send button click event
+    if (sendButton) {
+      sendButton.addEventListener("click", function () {
+        sendMessage();
+      });
+    }
+
+    // Attach enter key event
+    if (userInput) {
+      userInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+          sendMessage();
+        }
+      });
+    }
+
+    // Add a global debug function that the user can call from the browser console
+    window.toggleChatbot = function () {
+      console.log("Manual chatbot toggle called");
+      chatbotContainer.style.display = "flex";
+      chatbotContainer.style.zIndex = "9999";
+    };
+
+    console.log(
+      "Chatbot initialization complete. Type window.toggleChatbot() in console to manually show the chatbot"
+    );
+  });
+</script>
+
+<!-- Add a simple button at the very bottom of the page as a fallback -->
+<div
+  style="position: fixed; bottom: 10px; right: 10px; z-index: 10000"
+  id="fallback-chat-button"
+>
+  <button
+    onclick="document.getElementById('chatbot-container').style.display='flex'; this.style.display='none';"
+    style="
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    "
+  >
+    <i class="fas fa-comments"></i>
+  </button>
+</div>

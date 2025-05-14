@@ -31,6 +31,7 @@ class Publishers(models.Model):
 
     #__Publishers_FIELDS__
     pubname = models.TextField(max_length=255, null=True, blank=True)
+    description = models.TextField(max_length=255, null=True, blank=True)
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 
     #__Publishers_FIELDS__END
@@ -44,6 +45,7 @@ class Categories(models.Model):
 
     #__Categories_FIELDS__
     catname = models.TextField(max_length=255, null=True, blank=True)
+    description = models.TextField(max_length=255, null=True, blank=True)
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 
     #__Categories_FIELDS__END
@@ -57,6 +59,7 @@ class Authors(models.Model):
 
     #__Authors_FIELDS__
     authorname = models.TextField(max_length=255, null=True, blank=True)
+    description = models.TextField(max_length=255, null=True, blank=True)
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 
     #__Authors_FIELDS__END
@@ -180,6 +183,7 @@ class Areas(models.Model):
 
     #__Areas_FIELDS__
     areaname = models.TextField(max_length=255, null=True, blank=True)
+    description = models.TextField(max_length=255, null=True, blank=True)
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 
     #__Areas_FIELDS__END

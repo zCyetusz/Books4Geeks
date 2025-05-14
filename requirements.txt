@@ -6,3 +6,5 @@ django-admin-adminlte
 mysqlclient==2.2.4
 python-barcode==0.15.1
 Pillow==10.2.0
+requests==2.31.0
+google-generativeai==0.3.2

@@ -44,6 +44,7 @@ Author List {% endblock title %} {% block ajax_content %}
                   <tr>
                     <th>ID</th>
                     <th>Name</th>
+                    <th>Description</th>
                     <th>Last Modified</th>
                     <th>Actions</th>
                   </tr>
@@ -53,6 +54,7 @@ Author List {% endblock title %} {% block ajax_content %}
                   <tr>
                     <td>{{ author.id }}</td>
                     <td>{{ author.authorname }}</td>
+                    <td>{{ author.description }}</td>
                     <td>{{ author.lastmodified }}</td>
                     <td>
                       <a
