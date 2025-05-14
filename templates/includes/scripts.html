@@ -8,3 +8,96 @@
 <script src="{% static 'dist/js/adminlte.min.js' %}"></script>
 <!-- AdminLTE for demo purposes -->
 <script src="{% static 'dist/js/demo.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const btn = document.getElementById('toggle-darkmode');
+  const icon = btn.querySelector('i');
+  
+  // Kiểm tra trạng thái dark mode đã lưu
+  if(localStorage.getItem('darkmode') === 'on') {
+    document.body.classList.add('dark-mode');
+    icon.classList.replace('fa-moon', 'fa-sun');
+  }
+
+  btn.addEventListener('click', function() {
+    document.body.classList.toggle('dark-mode');
+    
+    // Đổi icon
+    if(document.body.classList.contains('dark-mode')) {
+      icon.classList.replace('fa-moon', 'fa-sun');
+      localStorage.setItem('darkmode', 'on');
+    } else {
+      icon.classList.replace('fa-sun', 'fa-moon');
+      localStorage.setItem('darkmode', 'off');
+    }
+  });
+
+  const searchInput = document.getElementById('search-input');
+  const searchResults = document.getElementById('search-results');
+  let searchTimeout;
+
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const query = this.value.trim();
+    
+    if (query.length < 2) {
+      searchResults.classList.remove('active');
+      return;
+    }
+
+    searchTimeout = setTimeout(() => {
+      fetch(`/ajax/search/?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+          let html = '';
+          
+          if (data.books.length > 0) {
+            html += '<div class="search-section"><strong>Books</strong>';
+            data.books.forEach(book => {
+              html += `<div class="search-result-item" onclick="window.location.href='/books/${book.id}'">
+                ${book.title} <span class="type">Book</span>
+              </div>`;
+            });
+            html += '</div>';
+          }
+
+          if (data.authors.length > 0) {
+            html += '<div class="search-section"><strong>Authors</strong>';
+            data.authors.forEach(author => {
+              html += `<div class="search-result-item" onclick="window.location.href='/authors/${author.id}'">
+                ${author.name} <span class="type">Author</span>
+              </div>`;
+            });
+            html += '</div>';
+          }
+
+          if (data.categories.length > 0) {
+            html += '<div class="search-section"><strong>Categories</strong>';
+            data.categories.forEach(category => {
+              html += `<div class="search-result-item" onclick="window.location.href='/categories/${category.id}'">
+                ${category.name} <span class="type">Category</span>
+              </div>`;
+            });
+            html += '</div>';
+          }
+
+          if (html) {
+            searchResults.innerHTML = html;
+            searchResults.classList.add('active');
+          } else {
+            searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+            searchResults.classList.add('active');
+          }
+        });
+    }, 300);
+  });
+
+  // Đóng kết quả tìm kiếm khi click ra ngoài
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.remove('active');
+    }
+  });
+});
+</script>

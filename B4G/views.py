@@ -532,3 +532,29 @@ def get_book_by_barcode(request, barcode_number):
         return JsonResponse(data)
     except Books.DoesNotExist:
         return JsonResponse({'error': 'Book not found'}, status=404)
+
+def ajax_search(request):
+    q = request.GET.get('q', '')
+    results = []
+    
+    if q:
+        books = Book.objects.filter(
+            Q(title__icontains=q) | 
+            Q(description__icontains=q)
+        )[:5]
+        
+        authors = Author.objects.filter(
+            Q(name__icontains=q)
+        )[:5]
+        
+        categories = Category.objects.filter(
+            Q(name__icontains=q)
+        )[:5]
+        
+        results = {
+            'books': [{'id': b.id, 'title': b.title, 'type': 'book'} for b in books],
+            'authors': [{'id': a.id, 'name': a.name, 'type': 'author'} for a in authors],
+            'categories': [{'id': c.id, 'name': c.name, 'type': 'category'} for c in categories]
+        }
+    
+    return JsonResponse(results)
