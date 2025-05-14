@@ -1,0 +1,98 @@
+{% extends 'layouts/base.html' %} {% load static %} {% block content %}
+<div id="ajax-content">{% block ajax_content %}{% endblock %}</div>
+{% endblock %} {% block extra_scripts %}
+<script>
+  $(document).ready(function () {
+    // Save scroll position
+    var saveScrollPosition = function () {
+      sessionStorage.setItem("scrollPosition", $(window).scrollTop());
+    };
+
+    // Restore scroll position
+    var restoreScrollPosition = function () {
+      var position = sessionStorage.getItem("scrollPosition");
+      if (position !== null) {
+        $(window).scrollTop(position);
+      }
+    };
+
+    // Handle sidebar menu clicks
+    $(".nav-sidebar a")
+      .not(".direct-link")
+      .on("click", function (e) {
+        e.preventDefault();
+        var url = $(this).attr("href");
+        saveScrollPosition();
+
+        // Mark current item as active
+        $(".nav-sidebar .nav-link").removeClass("active");
+        $(this).addClass("active");
+
+        // Store the active menu item in sessionStorage
+        sessionStorage.setItem("activeMenuItem", $(this).attr("href"));
+
+        // Load content via AJAX
+        $.ajax({
+          url: url,
+          type: "GET",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          success: function (data) {
+            $("#ajax-content").html($(data).find("#ajax-content").html());
+
+            // Update URL without reloading the page
+            history.pushState({}, "", url);
+
+            // Initialize any plugins needed for the new content
+            initializePlugins();
+
+            restoreScrollPosition();
+          },
+          error: function () {
+            // If AJAX fails, fall back to normal navigation
+            window.location.href = url;
+          },
+        });
+      });
+
+    // Handle browser back/forward buttons
+    $(window).on("popstate", function () {
+      // Load the content from the URL in browser history
+      $.ajax({
+        url: window.location.href,
+        type: "GET",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        success: function (data) {
+          $("#ajax-content").html($(data).find("#ajax-content").html());
+          initializePlugins();
+        },
+        error: function () {
+          window.location.reload();
+        },
+      });
+    });
+
+    // Restore active menu item on page load
+    var activeMenuItem = sessionStorage.getItem("activeMenuItem");
+    if (activeMenuItem) {
+      $('.nav-sidebar a[href="' + activeMenuItem + '"]').addClass("active");
+    }
+
+    // Function to initialize plugins
+    function initializePlugins() {
+      // Initialize DataTables if present
+      if ($.fn.DataTable && $("#example1").length > 0) {
+        $("#example1")
+          .DataTable({
+            responsive: true,
+            lengthChange: false,
+            autoWidth: false,
+            buttons: ["copy", "csv", "excel", "pdf", "print", "colvis"],
+          })
+          .buttons()
+          .container()
+          .appendTo("#example1_wrapper .col-md-6:eq(0)");
+      }
+    }
+  });
+</script>
+{% endblock %}

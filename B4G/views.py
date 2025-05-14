@@ -136,7 +136,13 @@ def index3(request):
 @login_required
 def publisher_list(request):
     publishers = Publishers.objects.all()
-    return render(request, 'publisher/list.html', {'publishers': publishers})
+    template = 'publisher/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'publisher/ajax_list.html'
+        
+    return render(request, template, {'publishers': publishers})
 
 @login_required
 def publisher_create(request):
@@ -145,7 +151,14 @@ def publisher_create(request):
         Publishers.objects.create(pubname=pubname)
         messages.success(request, 'Publisher created successfully!')
         return redirect('publisher_list')
-    return render(request, 'publisher/create.html')
+    
+    template = 'publisher/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'publisher/ajax_create.html'
+        
+    return render(request, template)
 
 @login_required
 def publisher_edit(request, pk):
@@ -155,7 +168,14 @@ def publisher_edit(request, pk):
         publisher.save()
         messages.success(request, 'Publisher updated successfully!')
         return redirect('publisher_list')
-    return render(request, 'publisher/edit.html', {'publisher': publisher})
+    
+    template = 'publisher/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'publisher/ajax_edit.html'
+        
+    return render(request, template, {'publisher': publisher})
 
 @login_required
 def publisher_delete(request, pk):
@@ -168,7 +188,13 @@ def publisher_delete(request, pk):
 @login_required
 def category_list(request):
     categories = Categories.objects.all()
-    return render(request, 'category/list.html', {'categories': categories})
+    template = 'category/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'category/ajax_list.html'
+        
+    return render(request, template, {'categories': categories})
 
 @login_required
 def category_create(request):
@@ -177,7 +203,14 @@ def category_create(request):
         Categories.objects.create(catname=catname)
         messages.success(request, 'Category created successfully!')
         return redirect('category_list')
-    return render(request, 'category/create.html')
+    
+    template = 'category/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'category/ajax_create.html'
+        
+    return render(request, template)
 
 @login_required
 def category_edit(request, pk):
@@ -187,7 +220,14 @@ def category_edit(request, pk):
         category.save()
         messages.success(request, 'Category updated successfully!')
         return redirect('category_list')
-    return render(request, 'category/edit.html', {'category': category})
+    
+    template = 'category/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'category/ajax_edit.html'
+        
+    return render(request, template, {'category': category})
 
 @login_required
 def category_delete(request, pk):
@@ -195,6 +235,58 @@ def category_delete(request, pk):
     category.delete()
     messages.success(request, 'Category deleted successfully!')
     return redirect('category_list')
+
+# Author Views
+@login_required
+def author_list(request):
+    authors = Authors.objects.all()
+    template = 'author/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'author/ajax_list.html'
+        
+    return render(request, template, {'authors': authors})
+
+@login_required
+def author_create(request):
+    if request.method == 'POST':
+        authorname = request.POST.get('authorname')
+        Authors.objects.create(authorname=authorname)
+        messages.success(request, 'Author created successfully!')
+        return redirect('author_list')
+    
+    template = 'author/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'author/ajax_create.html'
+        
+    return render(request, template)
+
+@login_required
+def author_edit(request, pk):
+    author = get_object_or_404(Authors, pk=pk)
+    if request.method == 'POST':
+        author.authorname = request.POST.get('authorname')
+        author.save()
+        messages.success(request, 'Author updated successfully!')
+        return redirect('author_list')
+    
+    template = 'author/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'author/ajax_edit.html'
+        
+    return render(request, template, {'author': author})
+
+@login_required
+def author_delete(request, pk):
+    author = get_object_or_404(Authors, pk=pk)
+    author.delete()
+    messages.success(request, 'Author deleted successfully!')
+    return redirect('author_list')
 
 # Book Views
 @login_required

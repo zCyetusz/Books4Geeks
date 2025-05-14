@@ -37,7 +37,9 @@
       {% include 'includes/sidebar.html' %}
     {% endblock sidebar %}
     
-    {% block content %}{% endblock content %}
+    <div id="main-content">
+      {% block content %}{% endblock content %}
+    </div>
 
     {% block footer %}
       {% include 'includes/footer.html' %}
@@ -56,6 +58,80 @@
   </div>
   
   {% include 'includes/scripts.html' %}
+  
+  <script>
+    $(document).ready(function() {
+      // Handle AJAX navigation for sidebar links
+      $('.ajax-link').on('click', function(e) {
+        e.preventDefault();
+        var url = $(this).attr('href');
+        
+        // Mark current item as active
+        $('.nav-sidebar .nav-link').removeClass('active');
+        $(this).addClass('active');
+        
+        // Store active menu in localStorage for persistence
+        localStorage.setItem('activeMenuItem', $(this).attr('href'));
+        
+        // Load content via AJAX
+        $.ajax({
+          url: url,
+          type: 'GET',
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+          success: function(data) {
+            $('#main-content').html($(data).find('#main-content').html());
+            
+            // Update URL without page reload
+            history.pushState({}, '', url);
+            
+            // Initialize plugins for the new content
+            initializePlugins();
+          },
+          error: function() {
+            // Fall back to normal navigation if AJAX fails
+            window.location.href = url;
+          }
+        });
+      });
+      
+      // Handle browser back/forward buttons
+      $(window).on('popstate', function() {
+        // Load content from browser history URL
+        $.ajax({
+          url: window.location.href,
+          type: 'GET',
+          headers: {'X-Requested-With': 'XMLHttpRequest'},
+          success: function(data) {
+            $('#main-content').html($(data).find('#main-content').html());
+            initializePlugins();
+          },
+          error: function() {
+            window.location.reload();
+          }
+        });
+      });
+      
+      // Restore active menu item on page load
+      var activeMenuItem = localStorage.getItem('activeMenuItem');
+      if (activeMenuItem) {
+        $('.nav-sidebar a[href="' + activeMenuItem + '"]').addClass('active');
+      }
+      
+      // Function to initialize plugins in dynamically loaded content
+      function initializePlugins() {
+        // Initialize DataTables if present
+        if ($.fn.DataTable && $('#example1').length > 0) {
+          $("#example1").DataTable({
+            "responsive": true, 
+            "lengthChange": false, 
+            "autoWidth": false,
+            "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
+          }).buttons().container().appendTo('#example1_wrapper .col-md-6:eq(0)');
+        }
+      }
+    });
+  </script>
+  
   {% block extra_scripts %}{% endblock extra_scripts %}
 
 

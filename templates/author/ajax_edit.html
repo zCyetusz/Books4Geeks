@@ -1,0 +1,177 @@
+{% extends 'layouts/ajax_base.html' %} {% load static %} {% block title %} Edit
+Author {% endblock title %} {% block ajax_content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Edit Author</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'author_list' %}" class="ajax-link">Authors</a>
+            </li>
+            <li class="breadcrumb-item active">Edit</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Edit Author</h3>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <form method="post" id="editAuthorForm">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="authorname">Author Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="authorname"
+                    name="authorname"
+                    value="{{ author.authorname }}"
+                    required
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary">Update</button>
+                <a
+                  href="{% url 'author_list' %}"
+                  class="btn btn-secondary ajax-link"
+                  >Cancel</a
+                >
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock ajax_content %} {% block extra_scripts %}
+<script>
+  $(document).ready(function () {
+    // Handle form submission with AJAX
+    $("#editAuthorForm").on("submit", function (e) {
+      e.preventDefault();
+      var form = $(this);
+      var url = "{% url 'author_edit' author.id %}";
+
+      $.ajax({
+        type: "POST",
+        url: url,
+        data: form.serialize(),
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        success: function (response) {
+          // Show success message with Toast
+          $(document).Toasts("create", {
+            class: "bg-success",
+            title: "Success",
+            body: "Author updated successfully!",
+          });
+
+          // Navigate back to list view via AJAX
+          setTimeout(function () {
+            $.ajax({
+              url: "{% url 'author_list' %}",
+              type: "GET",
+              headers: { "X-Requested-With": "XMLHttpRequest" },
+              success: function (data) {
+                $("#ajax-content").html($(data).find("#ajax-content").html());
+                history.pushState({}, "", "{% url 'author_list' %}");
+
+                // Initialize DataTable
+                if ($.fn.DataTable && $("#example1").length > 0) {
+                  $("#example1")
+                    .DataTable({
+                      responsive: true,
+                      lengthChange: false,
+                      autoWidth: false,
+                      buttons: [
+                        "copy",
+                        "csv",
+                        "excel",
+                        "pdf",
+                        "print",
+                        "colvis",
+                      ],
+                    })
+                    .buttons()
+                    .container()
+                    .appendTo("#example1_wrapper .col-md-6:eq(0)");
+                }
+
+                // Rebind AJAX links
+                bindAjaxLinks();
+              },
+              error: function () {
+                window.location.href = "{% url 'author_list' %}";
+              },
+            });
+          }, 1000);
+        },
+        error: function (xhr, errmsg, err) {
+          // Handle errors with Toast notification
+          $(document).Toasts("create", {
+            class: "bg-danger",
+            title: "Error",
+            body: "Error updating author. Please try again.",
+          });
+          console.log(xhr.status + ": " + xhr.responseText);
+        },
+      });
+    });
+
+    // Handle AJAX navigation for links
+    function bindAjaxLinks() {
+      $(".ajax-link").on("click", function (e) {
+        e.preventDefault();
+        var url = $(this).attr("href");
+
+        // Load content via AJAX
+        $.ajax({
+          url: url,
+          type: "GET",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          success: function (data) {
+            $("#ajax-content").html($(data).find("#ajax-content").html());
+
+            // Update URL without reloading the page
+            history.pushState({}, "", url);
+
+            // Rebind AJAX links
+            bindAjaxLinks();
+          },
+          error: function () {
+            // If AJAX fails, fall back to normal navigation
+            window.location.href = url;
+          },
+        });
+      });
+    }
+
+    // Initial binding
+    bindAjaxLinks();
+  });
+</script>
+{% endblock extra_scripts %}
