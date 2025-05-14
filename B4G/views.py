@@ -1,17 +1,7 @@
+from django.shortcuts import render, redirect
 from B4G.forms import LoginForm, RegistrationForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm
 from django.contrib.auth import logout
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
-from django.db.models import Q
-from .models import *
-import barcode
-from barcode.writer import ImageWriter
-from io import BytesIO
-from django.core.files import File
-import os
+
 from django.contrib.auth import views as auth_views
 
 # Create your views here.
@@ -131,6 +121,27 @@ def index3(request):
     'segment': 'dashboardv3'
   }
   return render(request, 'pages/index3.html', context)
+
+
+# -*- encoding: utf-8 -*-
+"""
+Copyright (c) 2019 - present AppSeed.us
+"""
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponse, JsonResponse
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import *
+import barcode
+from barcode.writer import ImageWriter
+from io import BytesIO
+from django.core.files import File
+import os
+
+# Create your views here.
 
 def index(request):
 
