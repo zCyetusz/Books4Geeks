@@ -871,7 +871,7 @@
       <p>Informational</p>
     </a>
   </li>
-  {% endif %} {% endcomment %} {% if request.user.is_superuser %}
+  {% endif %} {% endcomment %} {% if request.user.is_authenticated %}
   <li class="nav-item">
     <a href="{% url 'logout' %}" class="nav-link">
       <i class="fa fa-sign-out-alt nav-icon"></i>
