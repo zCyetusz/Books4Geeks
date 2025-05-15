@@ -1,0 +1,77 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Create Area</h3>
+    <div class="card-tools">
+      <a href="{% url 'area_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="area-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="areaname">Area Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="areaname"
+          name="areaname"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea
+          class="form-control"
+          id="description"
+          name="description"
+          rows="3"
+          placeholder="Enter area description"
+        ></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+      <a href="{% url 'area_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<script>
+  $(function () {
+    // Handle form submission
+    $("#area-form").on("submit", function(e) {
+      e.preventDefault();
+      
+      let formData = {
+        areaname: $("#areaname").val(),
+        description: $("#description").val(),
+        csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val()
+      };
+      
+      $.ajax({
+        url: "{% url 'area_create' %}",
+        type: "POST",
+        data: formData,
+        success: function(data) {
+          // Redirect to list page
+          loadContent("{% url 'area_list' %}");
+          // Show success message
+          toastr.success("Area created successfully!");
+        },
+        error: function(xhr, status, error) {
+          toastr.error("An error occurred while creating the area.");
+        }
+      });
+    });
+    
+    // Handle AJAX links
+    $(".ajax-link").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      loadContent(url);
+    });
+  });
+</script> 

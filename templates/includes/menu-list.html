@@ -902,9 +902,7 @@
         </a>
       </li>
       <li class="nav-item">
-        {% comment %}
         <a href="{% url 'book_list' %}" class="nav-link ajax-link">
-          {% endcomment %}
           <i class="far fa-circle nav-icon"></i>
           <p>Books</p>
         </a>
@@ -922,31 +920,83 @@
     </a>
     <ul class="nav nav-treeview">
       <li class="nav-item">
-        {% comment %}
         <a href="{% url 'area_list' %}" class="nav-link ajax-link">
-          {% endcomment %}
           <i class="far fa-circle nav-icon"></i>
           <p>Areas</p>
         </a>
       </li>
       <li class="nav-item">
-        {% comment %}
-        <a href="{% url 'shelves_list' %}" class="nav-link ajax-link">
-          {% endcomment %}
+        <a href="{% url 'shelf_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
           <p>Shelves</p>
         </a>
       </li>
       <li class="nav-item">
-        {% comment %}
-        <a href="{% url 'assign_list' %}" class="nav-link ajax-link">
-          {% endcomment %}
+        <a href="{% url 'bookshelf_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
           <p>Assign Book to Shelves</p>
         </a>
       </li>
     </ul>
   </li>
+  
+  <!-- Bills -->
+  <li class="nav-item">
+    <a href="#" class="nav-link">
+      <i class="nav-icon fas fa-file-invoice-dollar"></i>
+      <p>
+        Bills
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'bill_list' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Bill List</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'bill_create' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Create Bill</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'bill_scan_barcode' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Scan Barcode</p>
+        </a>
+      </li>
+    </ul>
+  </li>
+  
+  <!-- Customers -->
+  <li class="nav-item">
+    <a href="#" class="nav-link">
+      <i class="nav-icon fas fa-users"></i>
+      <p>
+        Customers
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'customer_list' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Customer List</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'customer_create' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Create Customer</p>
+        </a>
+      </li>
+    </ul>
+  </li>
+  
+  <!-- Reservations -->
   <li class="nav-item">
     {% comment %}
     <a href="{% url 'reservation_list' %}" class="nav-link ajax-link">

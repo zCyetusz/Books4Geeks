@@ -1,0 +1,703 @@
+{% extends 'layouts/base.html' %}
+
+{% load static %}
+
+{% block title %} Scan Barcode {% endblock title %}
+
+<!-- Specific CSS goes HERE -->
+{% block stylesheets %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<style>
+  #interactive.viewport {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    overflow: hidden;
+    text-align: center;
+    border: 3px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+  }
+  
+  #interactive.viewport canvas, video {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  
+  #interactive.viewport canvas.drawingBuffer, video.drawingBuffer {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+  
+  #scanned-books {
+    max-height: 500px;
+    overflow-y: auto;
+  }
+  
+  .scan-result {
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+  }
+  
+  .loading-spinner {
+    display: none;
+    text-align: center;
+    margin: 20px 0;
+  }
+  
+  .scan-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(76, 175, 80, 0.3);
+    display: none;
+    pointer-events: none;
+    z-index: 10;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Scan Barcode</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'bill_list' %}">Bills</a></li>
+            <li class="breadcrumb-item active">Scan Barcode</li>
+          </ol>
+        </div>
+      </div>
+    </div><!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Barcode Scanner</h3>
+              <div class="card-tools">
+                <a href="{% url 'bill_list' %}" class="btn btn-default ajax-link">
+                  <i class="fas fa-arrow-left"></i> Back to Bills
+                </a>
+                <a href="{% url 'bill_create' %}" class="btn btn-primary ajax-link">
+                  <i class="fas fa-plus"></i> New Bill
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-7">
+                  <!-- Scanner Section -->
+                  <div class="card">
+                    <div class="card-header">
+                      <h3 class="card-title">
+                        <i class="fas fa-camera"></i> Camera Feed
+                      </h3>
+                      <div class="card-tools">
+                        <button type="button" id="start-button" class="btn btn-success btn-sm">
+                          <i class="fas fa-play"></i> Start Scanner
+                        </button>
+                        <button type="button" id="stop-button" class="btn btn-danger btn-sm" disabled>
+                          <i class="fas fa-stop"></i> Stop Scanner
+                        </button>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div id="scanner-container">
+                        <div id="interactive" class="viewport">
+                          <div class="scan-indicator"></div>
+                        </div>
+                      </div>
+                      
+                      <div class="form-group mt-3">
+                        <label for="barcode-manual">Or enter barcode manually:</label>
+                        <div class="input-group">
+                          <input type="text" id="barcode-manual" class="form-control" placeholder="Enter barcode number">
+                          <div class="input-group-append">
+                            <button id="lookup-barcode" class="btn btn-primary">
+                              <i class="fas fa-search"></i> Lookup
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div class="loading-spinner" id="loading-spinner">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <div>Processing barcode...</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Customer Selection -->
+                  <div class="card mt-3">
+                    <div class="card-header">
+                      <h3 class="card-title">
+                        <i class="fas fa-user"></i> Customer Selection
+                      </h3>
+                    </div>
+                    <div class="card-body">
+                      <div class="form-group">
+                        <label for="customer-select">Select Customer:</label>
+                        <select class="form-control select2" id="customer-select" required>
+                          <option value="">Select a customer</option>
+                          {% for customer in customers %}
+                          <option value="{{ customer.id }}">{{ customer.cusname }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-5">
+                  <!-- Scanned Books Section -->
+                  <div class="card">
+                    <div class="card-header">
+                      <h3 class="card-title">
+                        <i class="fas fa-list"></i> Scanned Books
+                      </h3>
+                      <div class="card-tools">
+                        <button type="button" id="create-bill-button" class="btn btn-primary btn-sm" disabled>
+                          <i class="fas fa-shopping-cart"></i> Create Bill
+                        </button>
+                        <button type="button" id="clear-button" class="btn btn-warning btn-sm" disabled>
+                          <i class="fas fa-trash"></i> Clear List
+                        </button>
+                      </div>
+                    </div>
+                    <div class="card-body">
+                      <div id="scanned-books" class="scanned-books">
+                        <div class="text-muted text-center">
+                          <i class="fas fa-barcode fa-3x mb-3"></i>
+                          <p>Scan a barcode to add books to the list.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+{% block javascripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<!-- QuaggaJS for barcode scanning -->
+<script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+
+<script>
+  $(function () {
+    // Store scanned books
+    var scannedBooks = [];
+    var scannerInitialized = false;
+    var scanTimeout;
+    var detectionCount = 0;
+    var lastDetectedCode = '';
+    var isProcessing = false;
+    
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4'
+    });
+    
+    // Start scanner button
+    $('#start-button').on('click', function() {
+      console.log("Start scanner button clicked");
+      startScanner();
+    });
+    
+    // Stop scanner button
+    $('#stop-button').on('click', function() {
+      console.log("Stop scanner button clicked");
+      stopScanner();
+      $(this).prop('disabled', true);
+      $('#start-button').prop('disabled', false);
+    });
+    
+    // Clear button
+    $('#clear-button').on('click', function() {
+      clearScannedBooks();
+    });
+    
+    // Manual lookup button
+    $('#lookup-barcode').on('click', function() {
+      var barcode = $('#barcode-manual').val().trim();
+      if (barcode) {
+        lookupBarcode(barcode);
+        $('#barcode-manual').val('');
+      }
+    });
+    
+    // Enter key on the manual input
+    $('#barcode-manual').on('keypress', function(e) {
+      if (e.which === 13) { // Enter key
+        $('#lookup-barcode').click();
+        e.preventDefault();
+      }
+    });
+    
+    // Create bill button
+    $('#create-bill-button').on('click', function() {
+      createBillFromScannedBooks();
+    });
+    
+    // Initialize scanner
+    function startScanner() {
+      console.log("Starting scanner...");
+      
+      // First check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Sorry, your browser doesn't support camera access. Please try another browser or use manual barcode entry.");
+        return;
+      }
+      
+      // Disable start button and enable stop button
+      $('#start-button').prop('disabled', true);
+      $('#stop-button').prop('disabled', false);
+      
+      // If scanner is already initialized, just restart it
+      if (scannerInitialized) {
+        try {
+          Quagga.start();
+          return;
+        } catch (err) {
+          console.error("Error restarting scanner:", err);
+          // Fall through to reinitialize
+        }
+      }
+      
+      // Clear the scanner container first
+      $('#interactive').html('<div class="scan-indicator"></div>');
+      
+      // Initialize Quagga with camera
+      Quagga.init({
+        inputStream: {
+          name: "Live",
+          type: "LiveStream",
+          target: document.querySelector('#interactive'),
+          constraints: {
+            width: 640,
+            height: 480,
+            facingMode: "environment" // Use the rear camera on mobile devices
+          }
+        },
+        locator: {
+          patchSize: "medium",
+          halfSample: true
+        },
+        numOfWorkers: navigator.hardwareConcurrency || 2,
+        frequency: 10,
+        decoder: {
+          readers: ["ean_reader", "ean_8_reader", "code_128_reader", "code_39_reader", "upc_reader"]
+        },
+        locate: true
+      }, function(err) {
+        if (err) {
+          console.error("Error initializing scanner:", err);
+          alert("Error initializing the scanner: " + err.message + ". Please make sure your camera is accessible and try again.");
+          $('#start-button').prop('disabled', false);
+          $('#stop-button').prop('disabled', true);
+          return;
+        }
+        
+        console.log("Quagga initialized successfully");
+        scannerInitialized = true;
+        
+        // Start Quagga
+        try {
+          Quagga.start();
+          console.log("Quagga started");
+        } catch (startErr) {
+          console.error("Error starting Quagga:", startErr);
+          alert("Error starting the scanner. Please try again.");
+          $('#start-button').prop('disabled', false);
+          $('#stop-button').prop('disabled', true);
+        }
+      });
+      
+      // Set up detection event
+      Quagga.onDetected(handleBarcodeDetection);
+      
+      // Set up processing event
+      Quagga.onProcessed(function(result) {
+        var drawingCtx = Quagga.canvas.ctx.overlay,
+            drawingCanvas = Quagga.canvas.dom.overlay;
+
+        if (result) {
+          if (result.boxes) {
+            drawingCtx.clearRect(0, 0, parseInt(drawingCanvas.getAttribute("width")), parseInt(drawingCanvas.getAttribute("height")));
+            result.boxes.filter(function (box) {
+              return box !== result.box;
+            }).forEach(function (box) {
+              Quagga.ImageDebug.drawPath(box, {x: 0, y: 1}, drawingCtx, {color: "green", lineWidth: 2});
+            });
+          }
+
+          if (result.box) {
+            Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, drawingCtx, {color: "#00F", lineWidth: 2});
+          }
+
+          if (result.codeResult && result.codeResult.code) {
+            Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, drawingCtx, {color: 'red', lineWidth: 3});
+          }
+        }
+      });
+    }
+    
+    // Handle barcode detection
+    function handleBarcodeDetection(result) {
+      var code = result.codeResult.code;
+      
+      if (isProcessing) {
+        return;
+      }
+      
+      console.log("Detected barcode:", code);
+      
+      // Ensure the same code is detected multiple times to improve accuracy
+      if (code === lastDetectedCode) {
+        detectionCount++;
+      } else {
+        detectionCount = 1;
+        lastDetectedCode = code;
+      }
+      
+      // Require 2 consecutive detections of the same code
+      if (detectionCount >= 2) {
+        // Show scan indicator
+        $('.scan-indicator').show();
+        setTimeout(function() {
+          $('.scan-indicator').hide();
+        }, 300);
+        
+        // Process the barcode
+        isProcessing = true;
+        $('#loading-spinner').show();
+        
+        // Clear previous timeout
+        if (scanTimeout) {
+          clearTimeout(scanTimeout);
+        }
+        
+        // Create a small delay to avoid multiple scans
+        scanTimeout = setTimeout(function() {
+          lookupBarcode(code);
+          lastDetectedCode = '';
+          detectionCount = 0;
+          isProcessing = false;
+        }, 500);
+      }
+    }
+    
+    // Stop the scanner
+    function stopScanner() {
+      console.log("Stopping scanner...");
+      if (scannerInitialized) {
+        try {
+          Quagga.stop();
+          console.log("Quagga stopped");
+        } catch (err) {
+          console.error("Error stopping Quagga:", err);
+        }
+      }
+    }
+    
+    // Lookup a barcode via API
+    function lookupBarcode(barcode) {
+      $('#loading-spinner').show();
+      
+      $.ajax({
+        url: '/api/get_book_by_barcode/' + barcode + '/',
+        type: 'GET',
+        success: function(data) {
+          if (data.success) {
+            // Check if book is already in the list
+            var bookExists = false;
+            for (var i = 0; i < scannedBooks.length; i++) {
+              if (scannedBooks[i].id === data.id) {
+                // Increment quantity instead of adding again
+                scannedBooks[i].quantity++;
+                bookExists = true;
+                break;
+              }
+            }
+            
+            if (!bookExists) {
+              // Add book to the list
+              scannedBooks.push({
+                id: data.id,
+                description: data.description,
+                price: data.price,
+                quantity: 1,
+                publisher: data.publisher,
+                authors: data.authors.join(', '),
+                categories: data.categories.join(', ')
+              });
+            }
+            
+            // Update the display
+            updateScannedBooksList();
+            
+            // Play success sound
+            playSound('success');
+          } else {
+            console.error("Invalid barcode response:", data);
+            alert("Could not find book with barcode: " + barcode);
+            playSound('error');
+          }
+        },
+        error: function(xhr) {
+          console.error("Error looking up barcode:", xhr);
+          alert("Error looking up barcode: " + barcode);
+          playSound('error');
+        },
+        complete: function() {
+          $('#loading-spinner').hide();
+          isProcessing = false;
+        }
+      });
+    }
+    
+    // Update the scanned books list
+    function updateScannedBooksList() {
+      var container = $('#scanned-books');
+      container.empty();
+      
+      if (scannedBooks.length === 0) {
+        container.html('<div class="text-muted text-center"><i class="fas fa-barcode fa-3x mb-3"></i><p>Scan a barcode to add books to the list.</p></div>');
+        $('#create-bill-button').prop('disabled', true);
+        $('#clear-button').prop('disabled', true);
+        return;
+      }
+      
+      var total = 0;
+      
+      scannedBooks.forEach(function(book, index) {
+        var bookTotal = parseFloat(book.price) * book.quantity;
+        total += bookTotal;
+        
+        var itemHtml = '<div class="scan-result">' +
+          '<div class="d-flex justify-content-between">' +
+          '<h5>' + book.description + '</h5>' +
+          '<button class="btn btn-sm btn-danger remove-book" data-index="' + index + '"><i class="fas fa-times"></i></button>' +
+          '</div>' +
+          '<div class="row">' +
+          '<div class="col-md-4"><small class="text-muted">Price: $' + book.price + '</small></div>' +
+          '<div class="col-md-4">' +
+          '<div class="input-group input-group-sm">' +
+          '<div class="input-group-prepend">' +
+          '<button class="btn btn-outline-secondary decrease-qty" data-index="' + index + '">-</button>' +
+          '</div>' +
+          '<input type="number" class="form-control text-center book-quantity" value="' + book.quantity + '" min="1" data-index="' + index + '">' +
+          '<div class="input-group-append">' +
+          '<button class="btn btn-outline-secondary increase-qty" data-index="' + index + '">+</button>' +
+          '</div>' +
+          '</div>' +
+          '</div>' +
+          '<div class="col-md-4 text-right"><strong>Total: $' + bookTotal.toFixed(2) + '</strong></div>' +
+          '</div>' +
+          '<div><small class="text-muted">' + (book.authors ? 'By: ' + book.authors : '') + '</small></div>' +
+          '<div><small class="text-muted">' + (book.categories ? 'Categories: ' + book.categories : '') + '</small></div>' +
+          '</div>';
+        
+        container.append(itemHtml);
+      });
+      
+      // Add total at the bottom
+      container.append('<div class="card-footer text-right"><h4>Grand Total: $' + total.toFixed(2) + '</h4></div>');
+      
+      // Enable buttons
+      $('#create-bill-button').prop('disabled', false);
+      $('#clear-button').prop('disabled', false);
+      
+      // Bind events for quantity changes
+      $('.increase-qty').on('click', function() {
+        var index = $(this).data('index');
+        scannedBooks[index].quantity++;
+        updateScannedBooksList();
+      });
+      
+      $('.decrease-qty').on('click', function() {
+        var index = $(this).data('index');
+        if (scannedBooks[index].quantity > 1) {
+          scannedBooks[index].quantity--;
+          updateScannedBooksList();
+        }
+      });
+      
+      $('.book-quantity').on('change', function() {
+        var index = $(this).data('index');
+        var qty = parseInt($(this).val());
+        if (qty >= 1) {
+          scannedBooks[index].quantity = qty;
+          updateScannedBooksList();
+        } else {
+          $(this).val(1);
+        }
+      });
+      
+      $('.remove-book').on('click', function() {
+        var index = $(this).data('index');
+        scannedBooks.splice(index, 1);
+        updateScannedBooksList();
+      });
+    }
+    
+    // Clear scanned books
+    function clearScannedBooks() {
+      scannedBooks = [];
+      updateScannedBooksList();
+    }
+    
+    // Create a bill from scanned books
+    function createBillFromScannedBooks() {
+      if (scannedBooks.length === 0) {
+        alert('Please scan at least one book before creating a bill.');
+        return;
+      }
+      
+      var customerId = $('#customer-select').val();
+      if (!customerId) {
+        alert('Please select a customer before creating a bill.');
+        return;
+      }
+      
+      // Show loading indicator
+      $('#loading-spinner').show();
+      
+      // Use the create_bill_from_scanned API endpoint
+      $.ajax({
+        url: '/api/create_bill_from_scanned/',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          customer_id: customerId,
+          books: scannedBooks
+        }),
+        success: function(response) {
+          if (response.success) {
+            alert('Bill created successfully!');
+            clearScannedBooks();
+            
+            // If this is an AJAX page, load the bill list
+            if (typeof loadContent === 'function') {
+              loadContent("{% url 'bill_list' %}");
+            } else {
+              // Otherwise redirect to the bill list
+              window.location.href = "{% url 'bill_list' %}";
+            }
+          } else {
+            alert('Error creating bill: ' + response.error);
+          }
+        },
+        error: function(xhr) {
+          console.error("Error creating bill:", xhr);
+          alert('Error creating bill. Please try again.');
+        },
+        complete: function() {
+          $('#loading-spinner').hide();
+        }
+      });
+    }
+    
+    // Play sound for feedback
+    function playSound(type) {
+      // Use browser's built-in beep instead of audio files
+      if (type === 'success') {
+        // High-pitched beep for success
+        try {
+          var context = new (window.AudioContext || window.webkitAudioContext)();
+          var oscillator = context.createOscillator();
+          oscillator.type = 'sine';
+          oscillator.frequency.value = 1500;
+          oscillator.connect(context.destination);
+          oscillator.start();
+          setTimeout(function() { oscillator.stop(); }, 200);
+        } catch (e) {
+          console.log("Audio not supported:", e);
+        }
+      } else {
+        // Low-pitched beep for error
+        try {
+          var context = new (window.AudioContext || window.webkitAudioContext)();
+          var oscillator = context.createOscillator();
+          oscillator.type = 'sine';
+          oscillator.frequency.value = 300;
+          oscillator.connect(context.destination);
+          oscillator.start();
+          setTimeout(function() { oscillator.stop(); }, 400);
+        } catch (e) {
+          console.log("Audio not supported:", e);
+        }
+      }
+    }
+    
+    // Clean up when leaving the page
+    $(window).on('beforeunload', function() {
+      if (scannerInitialized) {
+        try {
+          Quagga.stop();
+        } catch (err) {
+          console.error("Error stopping Quagga on page unload:", err);
+        }
+      }
+    });
+    
+    // Check for camera availability on page load
+    // If camera is available, auto-start scanner
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function(stream) {
+          console.log("Camera is available, auto-starting scanner");
+          // Stop the test stream
+          stream.getTracks().forEach(track => track.stop());
+          // Auto-start scanner after a short delay to ensure UI is ready
+          setTimeout(function() {
+            $('#start-button').click();
+          }, 500);
+        })
+        .catch(function(error) {
+          console.error("Camera not available:", error);
+          // Leave the manual start button active
+        });
+    } else {
+      console.warn("MediaDevices API not supported by this browser");
+      alert("Your browser doesn't support camera access. You can still enter barcodes manually.");
+    }
+  });
+</script>
+{% endblock javascripts %} 

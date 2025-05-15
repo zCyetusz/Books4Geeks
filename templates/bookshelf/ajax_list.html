@@ -1,0 +1,110 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Book Shelf Assignment List</h3>
+    <div class="card-tools">
+      <a
+        href="{% url 'bookshelf_create' %}"
+        class="btn btn-primary btn-sm ajax-link"
+      >
+        <i class="fas fa-plus"></i> Assign Book to Shelf
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <table id="example1" class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Book</th>
+          <th>Shelf</th>
+          <th>Area</th>
+          <th>Quantity</th>
+          <th>Last Modified</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for bookshelf in bookshelves %}
+        <tr>
+          <td>{{ bookshelf.id }}</td>
+          <td>{{ bookshelf.id_book.description }}</td>
+          <td>{{ bookshelf.id_shelf.shelfname }}</td>
+          <td>{{ bookshelf.id_shelf.id_area.areaname }}</td>
+          <td>{{ bookshelf.quantity }}</td>
+          <td>{{ bookshelf.lastmodified }}</td>
+          <td>
+            <a
+              href="{% url 'bookshelf_edit' bookshelf.id %}"
+              class="btn btn-info btn-sm ajax-link"
+            >
+              <i class="fas fa-pencil-alt"></i> Edit
+            </a>
+            <a
+              href="{% url 'bookshelf_delete' bookshelf.id %}"
+              class="btn btn-danger btn-sm delete-btn"
+              data-confirm-message="Are you sure you want to delete this assignment?"
+            >
+              <i class="fas fa-trash"></i> Delete
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<!-- DataTables  & Plugins -->
+<script src="{{ static('plugins/datatables/jquery.dataTables.min.js') }}"></script>
+<script src="{{ static('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+<script src="{{ static('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+<script src="{{ static('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+<script src="{{ static('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
+<script src="{{ static('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+<script>
+  $(function () {
+    $("#example1")
+      .DataTable({
+        responsive: true,
+        lengthChange: false,
+        autoWidth: false,
+        buttons: ["copy", "csv", "excel", "pdf", "print", "colvis"],
+      })
+      .buttons()
+      .container()
+      .appendTo("#example1_wrapper .col-md-6:eq(0)");
+    
+    // Handle AJAX links
+    $(".ajax-link").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      loadContent(url);
+    });
+    
+    // Handle Delete Buttons
+    $(".delete-btn").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      let message = $(this).data("confirm-message");
+      
+      if (confirm(message)) {
+        $.ajax({
+          url: url,
+          type: "GET",
+          success: function(data) {
+            // Refresh the current view
+            loadContent("{% url 'bookshelf_list' %}");
+            // Show success message
+            toastr.success("Assignment deleted successfully!");
+          },
+          error: function(xhr, status, error) {
+            toastr.error("An error occurred while deleting the assignment.");
+          }
+        });
+      }
+    });
+  });
+</script> 

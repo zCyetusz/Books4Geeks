@@ -1,0 +1,167 @@
+{% extends 'layouts/base.html' %} {% load static %} {% block title %} Edit
+Book {% endblock title %} 
+
+{% block extra_styles %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+{% endblock extra_styles %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Edit Book</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'book_list' %}">Books</a>
+            </li>
+            <li class="breadcrumb-item active">Edit</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Edit Book</h3>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="bookname">Book Name</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="bookname"
+                    name="bookname"
+                    value="{{ book.bookname }}"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="description">Description</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="description"
+                    name="description"
+                    value="{{ book.description }}"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="price">Price</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="price"
+                    name="price"
+                    value="{{ book.price }}"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="publishdate">Publish Date</label>
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="publishdate"
+                    name="publishdate"
+                    value="{{ book.publishdate|date:'Y-m-d' }}"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="id_pub">Publisher</label>
+                  <select class="form-control" id="id_pub" name="id_pub" required>
+                    <option value="">Select a Publisher</option>
+                    {% for publisher in publishers %}
+                    <option value="{{ publisher.id }}" {% if publisher.id == book.id_pub.id %}selected{% endif %}>
+                      {{ publisher.pubname }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="authors">Authors</label>
+                  <select class="form-control select2" id="authors" name="authors[]" multiple>
+                    {% for author in authors %}
+                    <option value="{{ author.id }}" {% if author.id in book_authors %}selected{% endif %}>
+                      {{ author.authorname }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <small class="form-text text-muted">You can select multiple authors</small>
+                </div>
+                <div class="form-group">
+                  <label for="categories">Categories</label>
+                  <select class="form-control select2" id="categories" name="categories[]" multiple>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if category.id in book_categories %}selected{% endif %}>
+                      {{ category.catname }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <small class="form-text text-muted">You can select multiple categories</small>
+                </div>
+                {% if book.barcode %}
+                <div class="form-group">
+                  <label>Current Barcode</label>
+                  <div>
+                    <img src="{{ book.barcode.url }}" alt="Barcode" height="100">
+                    <p>Barcode Number: {{ book.barcode_number }}</p>
+                  </div>
+                </div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Update</button>
+                <a href="{% url 'book_list' %}" class="btn btn-secondary"
+                  >Cancel</a
+                >
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock content %}
+
+{% block extra_scripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<script>
+  $(function () {
+    //Initialize Select2 Elements
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      allowClear: true,
+      placeholder: "Select options..."
+    });
+  });
+</script>
+{% endblock extra_scripts %} 

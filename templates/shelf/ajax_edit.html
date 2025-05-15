@@ -1,0 +1,79 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Edit Shelf</h3>
+    <div class="card-tools">
+      <a href="{% url 'shelf_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="shelf-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="shelfname">Shelf Name</label>
+        <input
+          type="text"
+          class="form-control"
+          id="shelfname"
+          name="shelfname"
+          value="{{ shelf.shelfname }}"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="id_area">Area</label>
+        <select class="form-control" id="id_area" name="id_area" required>
+          <option value="">Select an Area</option>
+          {% for area in areas %}
+          <option value="{{ area.id }}" {% if area.id == shelf.id_area.id %}selected{% endif %}>
+            {{ area.areaname }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">Update</button>
+      <a href="{% url 'shelf_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<script>
+  $(function () {
+    // Handle form submission
+    $("#shelf-form").on("submit", function(e) {
+      e.preventDefault();
+      
+      let formData = {
+        shelfname: $("#shelfname").val(),
+        id_area: $("#id_area").val(),
+        csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val()
+      };
+      
+      $.ajax({
+        url: "{% url 'shelf_edit' shelf.id %}",
+        type: "POST",
+        data: formData,
+        success: function(data) {
+          // Redirect to list page
+          loadContent("{% url 'shelf_list' %}");
+          // Show success message
+          toastr.success("Shelf updated successfully!");
+        },
+        error: function(xhr, status, error) {
+          toastr.error("An error occurred while updating the shelf.");
+        }
+      });
+    });
+    
+    // Handle AJAX links
+    $(".ajax-link").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      loadContent(url);
+    });
+  });
+</script> 

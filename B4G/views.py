@@ -11,6 +11,7 @@ import barcode
 from barcode.writer import ImageWriter
 from io import BytesIO
 from django.core.files import File
+from django.conf import settings
 import os
 from django.contrib.auth import views as auth_views
 import json
@@ -312,12 +313,19 @@ def author_delete(request, pk):
 @login_required
 def book_list(request):
     books = Books.objects.all()
-    return render(request, 'book/list.html', {'books': books})
+    template = 'book/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'book/ajax_list.html'
+        
+    return render(request, template, {'books': books})
 
 @login_required
 def book_create(request):
     if request.method == 'POST':
         id_pub = get_object_or_404(Publishers, pk=request.POST.get('id_pub'))
+        bookname = request.POST.get('bookname')
         publishdate = request.POST.get('publishdate')
         price = request.POST.get('price')
         description = request.POST.get('description')
@@ -329,21 +337,68 @@ def book_create(request):
             description=description
         )
         
-        # Generate barcode
-        barcode_number = f"BK{book.id:06d}"
+        # Add authors
+        author_ids = request.POST.getlist('authors[]') or []
+        for author_id in author_ids:
+            author = get_object_or_404(Authors, pk=author_id)
+            Bookauthors.objects.create(
+                id_book=book,
+                id_author=author
+            )
+        
+        # Add categories
+        category_ids = request.POST.getlist('categories[]') or []
+        for category_id in category_ids:
+            category = get_object_or_404(Categories, pk=category_id)
+            Bookcategories.objects.create(
+                id_book=book,
+                id_cat=category
+            )
+        
+        # Generate barcode - EAN-13 requires 12 digits (13th is check digit)
+        # Use a prefix (e.g., 978 for books) and pad with zeros
+        barcode_number = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
         ean = barcode.get('ean13', barcode_number, writer=ImageWriter())
         buffer = BytesIO()
         ean.write(buffer)
         
+        # Ensure barcode directory exists
+        barcode_folder = os.path.join(settings.MEDIA_ROOT, 'barcodes')
+        os.makedirs(barcode_folder, exist_ok=True)
+        
         # Save barcode image
         filename = f'barcode_{book.id}.png'
-        book.barcode.save(filename, File(buffer), save=True)
+        file_path = os.path.join('barcodes', filename)
+        
+        # Set barcode number
+        book.barcode_number = barcode_number
+        
+        # Save barcode file to the barcode directory
+        book.barcode.save(file_path, File(buffer), save=True)
         
         messages.success(request, 'Book created successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
         return redirect('book_list')
     
     publishers = Publishers.objects.all()
-    return render(request, 'book/create.html', {'publishers': publishers})
+    authors = Authors.objects.all()
+    categories = Categories.objects.all()
+    
+    template = 'book/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'book/ajax_create.html'
+        
+    return render(request, template, {
+        'publishers': publishers,
+        'authors': authors,
+        'categories': categories
+    })
 
 @login_required
 def book_edit(request, pk):
@@ -353,18 +408,103 @@ def book_edit(request, pk):
         book.publishdate = request.POST.get('publishdate')
         book.price = request.POST.get('price')
         book.description = request.POST.get('description')
-        book.save()
+        
+        # Update authors - first remove all existing authors
+        Bookauthors.objects.filter(id_book=book).delete()
+        
+        # Add updated authors
+        author_ids = request.POST.getlist('authors[]') or []
+        for author_id in author_ids:
+            author = get_object_or_404(Authors, pk=author_id)
+            Bookauthors.objects.create(
+                id_book=book,
+                id_author=author
+            )
+        
+        # Update categories - first remove all existing categories
+        Bookcategories.objects.filter(id_book=book).delete()
+        
+        # Add updated categories
+        category_ids = request.POST.getlist('categories[]') or []
+        for category_id in category_ids:
+            category = get_object_or_404(Categories, pk=category_id)
+            Bookcategories.objects.create(
+                id_book=book,
+                id_cat=category
+            )
+        
+        # Check if barcode needs to be generated or regenerated
+        if not book.barcode or not book.barcode_number:
+            # Generate barcode - EAN-13 requires 12 digits (13th is check digit)
+            # Use a prefix (e.g., 978 for books) and pad with zeros
+            barcode_number = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
+            ean = barcode.get('ean13', barcode_number, writer=ImageWriter())
+            buffer = BytesIO()
+            ean.write(buffer)
+            
+            # Ensure barcode directory exists
+            barcode_folder = os.path.join(settings.MEDIA_ROOT, 'barcodes')
+            os.makedirs(barcode_folder, exist_ok=True)
+            
+            # Save barcode image
+            filename = f'barcode_{book.id}.png'
+            file_path = os.path.join('barcodes', filename)
+            
+            # Set barcode number
+            book.barcode_number = barcode_number
+            
+            # Save barcode file to the barcode directory
+            book.barcode.save(file_path, File(buffer), save=True)
+        else:
+            # Just save updated fields
+            book.save()
+            
         messages.success(request, 'Book updated successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
         return redirect('book_list')
     
     publishers = Publishers.objects.all()
-    return render(request, 'book/edit.html', {'book': book, 'publishers': publishers})
+    authors = Authors.objects.all()
+    categories = Categories.objects.all()
+    
+    # Get book authors and categories for pre-selecting in the form
+    book_authors = [ba.id_author.id for ba in Bookauthors.objects.filter(id_book=book)]
+    book_categories = [bc.id_cat.id for bc in Bookcategories.objects.filter(id_book=book)]
+    
+    template = 'book/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'book/ajax_edit.html'
+        
+    return render(request, template, {
+        'book': book, 
+        'publishers': publishers,
+        'authors': authors,
+        'categories': categories,
+        'book_authors': book_authors,
+        'book_categories': book_categories
+    })
 
 @login_required
 def book_delete(request, pk):
     book = get_object_or_404(Books, pk=pk)
+    
+    # Delete related authors and categories
+    Bookauthors.objects.filter(id_book=book).delete()
+    Bookcategories.objects.filter(id_book=book).delete()
+    
     book.delete()
     messages.success(request, 'Book deleted successfully!')
+    
+    # If it's an AJAX request, return a simple success response
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+        
     return redirect('book_list')
 
 # Import Views
@@ -409,7 +549,13 @@ def import_create(request):
 @login_required
 def bill_list(request):
     bills = Bills.objects.all()
-    return render(request, 'bill/list.html', {'bills': bills})
+    template = 'bill/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bill/ajax_list.html'
+        
+    return render(request, template, {'bills': bills})
 
 @login_required
 def bill_create(request):
@@ -425,220 +571,305 @@ def bill_create(request):
         # Create bill details
         book_ids = request.POST.getlist('book_ids[]')
         quantities = request.POST.getlist('quantities[]')
+        prices = request.POST.getlist('prices[]')
         
-        for book_id, quantity in zip(book_ids, quantities):
-            book = get_object_or_404(Books, pk=book_id)
-            total = float(book.price) * float(quantity)
+        for i in range(len(book_ids)):
+            book = get_object_or_404(Books, pk=book_ids[i])
+            quantity = int(quantities[i])
+            price = float(prices[i])
+            total = price * quantity
             
             Billdetails.objects.create(
                 id_book=book,
+                id_bill=bill,
+                quantity=quantity,
+                price=price,
                 total=total
             )
             
-            # Update book quantity
-            bookshelf = get_object_or_404(Bookshelves, id_book=book)
-            bookshelf.quantity = int(bookshelf.quantity) - int(quantity)
-            bookshelf.save()
+            # Update book quantity in inventory
+            try:
+                bookshelf = Bookshelves.objects.get(id_book=book)
+                current_quantity = int(bookshelf.quantity or 0)
+                if current_quantity >= quantity:
+                    bookshelf.quantity = current_quantity - quantity
+                    bookshelf.save()
+            except Bookshelves.DoesNotExist:
+                pass  # Handle case where book isn't in inventory
         
         messages.success(request, 'Bill created successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
         return redirect('bill_list')
     
     customers = Customers.objects.all()
     books = Books.objects.all()
-    return render(request, 'bill/create.html', {'customers': customers, 'books': books})
-
-# Area Views
-@login_required
-def area_list(request):
-    areas = Areas.objects.all()
-    return render(request, 'area/list.html', {'areas': areas})
-
-@login_required
-def area_create(request):
-    if request.method == 'POST':
-        areaname = request.POST.get('areaname')
-        Areas.objects.create(areaname=areaname)
-        messages.success(request, 'Area created successfully!')
-        return redirect('area_list')
-    return render(request, 'area/create.html')
-
-@login_required
-def area_edit(request, pk):
-    area = get_object_or_404(Areas, pk=pk)
-    if request.method == 'POST':
-        area.areaname = request.POST.get('areaname')
-        area.save()
-        messages.success(request, 'Area updated successfully!')
-        return redirect('area_list')
-    return render(request, 'area/edit.html', {'area': area})
-
-@login_required
-def area_delete(request, pk):
-    area = get_object_or_404(Areas, pk=pk)
-    area.delete()
-    messages.success(request, 'Area deleted successfully!')
-    return redirect('area_list')
-
-# Shelf Views
-@login_required
-def shelf_list(request):
-    shelves = Shelves.objects.all()
-    return render(request, 'shelf/list.html', {'shelves': shelves})
-
-@login_required
-def shelf_create(request):
-    if request.method == 'POST':
-        shelfname = request.POST.get('shelfname')
-        id_area = get_object_or_404(Areas, pk=request.POST.get('id_area'))
-        Shelves.objects.create(shelfname=shelfname, id_area=id_area)
-        messages.success(request, 'Shelf created successfully!')
-        return redirect('shelf_list')
     
-    areas = Areas.objects.all()
-    return render(request, 'shelf/create.html', {'areas': areas})
-
-@login_required
-def shelf_edit(request, pk):
-    shelf = get_object_or_404(Shelves, pk=pk)
-    if request.method == 'POST':
-        shelf.shelfname = request.POST.get('shelfname')
-        shelf.id_area = get_object_or_404(Areas, pk=request.POST.get('id_area'))
-        shelf.save()
-        messages.success(request, 'Shelf updated successfully!')
-        return redirect('shelf_list')
+    template = 'bill/create.html'
     
-    areas = Areas.objects.all()
-    return render(request, 'shelf/edit.html', {'shelf': shelf, 'areas': areas})
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bill/ajax_create.html'
+        
+    return render(request, template, {'customers': customers, 'books': books})
 
 @login_required
-def shelf_delete(request, pk):
-    shelf = get_object_or_404(Shelves, pk=pk)
-    shelf.delete()
-    messages.success(request, 'Shelf deleted successfully!')
-    return redirect('shelf_list')
-
-# Employee Views
-@login_required
-def employee_list(request):
-    employees = Employees.objects.all()
-    return render(request, 'employee/list.html', {'employees': employees})
-
-@login_required
-def employee_create(request):
-    if request.method == 'POST':
-        empname = request.POST.get('empname')
-        role = request.POST.get('role')
-        phone = request.POST.get('phone')
-        gender = request.POST.get('gender')
-        address = request.POST.get('address')
-        hiredate = request.POST.get('hiredate')
-        
-        # Create employee
-        employee = Employees.objects.create(
-            empname=empname,
-            role=role,
-            phone=phone,
-            gender=gender,
-            address=address,
-            hiredate=hiredate
-        )
-        
-        # Create user account
-        username = f"emp_{employee.id}"
-        password = request.POST.get('password')
-        user = User.objects.create_user(
-            username=username,
-            password=password,
-            first_name=empname
-        )
-        
-        messages.success(request, 'Employee created successfully!')
-        return redirect('employee_list')
+def bill_edit(request, pk):
+    bill = get_object_or_404(Bills, pk=pk)
+    bill_details = Billdetails.objects.filter(id_bill=bill)
     
-    return render(request, 'employee/create.html')
-
-@login_required
-def employee_edit(request, pk):
-    employee = get_object_or_404(Employees, pk=pk)
     if request.method == 'POST':
-        employee.empname = request.POST.get('empname')
-        employee.role = request.POST.get('role')
-        employee.phone = request.POST.get('phone')
-        employee.gender = request.POST.get('gender')
-        employee.address = request.POST.get('address')
-        employee.hiredate = request.POST.get('hiredate')
-        employee.save()
+        id_cus = get_object_or_404(Customers, pk=request.POST.get('id_cus'))
+        totalbill = request.POST.get('totalbill')
         
-        messages.success(request, 'Employee updated successfully!')
-        return redirect('employee_list')
+        bill.id_cus = id_cus
+        bill.totalbill = totalbill
+        bill.save()
+        
+        # First restore quantities to inventory
+        for detail in bill_details:
+            try:
+                bookshelf = Bookshelves.objects.get(id_book=detail.id_book)
+                current_quantity = int(bookshelf.quantity or 0)
+                bookshelf.quantity = current_quantity + int(detail.quantity or 0)
+                bookshelf.save()
+            except Bookshelves.DoesNotExist:
+                pass
+        
+        # Delete old bill details
+        bill_details.delete()
+        
+        # Create new bill details
+        book_ids = request.POST.getlist('book_ids[]')
+        quantities = request.POST.getlist('quantities[]')
+        prices = request.POST.getlist('prices[]')
+        
+        for i in range(len(book_ids)):
+            book = get_object_or_404(Books, pk=book_ids[i])
+            quantity = int(quantities[i])
+            price = float(prices[i])
+            total = price * quantity
+            
+            Billdetails.objects.create(
+                id_book=book,
+                id_bill=bill,
+                quantity=quantity,
+                price=price,
+                total=total
+            )
+            
+            # Update book quantity in inventory
+            try:
+                bookshelf = Bookshelves.objects.get(id_book=book)
+                current_quantity = int(bookshelf.quantity or 0)
+                if current_quantity >= quantity:
+                    bookshelf.quantity = current_quantity - quantity
+                    bookshelf.save()
+            except Bookshelves.DoesNotExist:
+                pass
+        
+        messages.success(request, 'Bill updated successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
+        return redirect('bill_list')
     
-    return render(request, 'employee/edit.html', {'employee': employee})
+    customers = Customers.objects.all()
+    books = Books.objects.all()
+    
+    bill_items = []
+    for detail in bill_details:
+        bill_items.append({
+            'book': detail.id_book,
+            'quantity': detail.quantity,
+            'price': detail.price,
+            'total': detail.total
+        })
+    
+    template = 'bill/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bill/ajax_edit.html'
+        
+    return render(request, template, {
+        'bill': bill,
+        'bill_items': bill_items,
+        'customers': customers,
+        'books': books
+    })
 
 @login_required
-def employee_delete(request, pk):
-    employee = get_object_or_404(Employees, pk=pk)
-    employee.delete()
-    messages.success(request, 'Employee deleted successfully!')
-    return redirect('employee_list')
+def bill_delete(request, pk):
+    bill = get_object_or_404(Bills, pk=pk)
+    bill_details = Billdetails.objects.filter(id_bill=bill)
+    
+    # First restore quantities to inventory
+    for detail in bill_details:
+        try:
+            bookshelf = Bookshelves.objects.get(id_book=detail.id_book)
+            current_quantity = int(bookshelf.quantity or 0)
+            bookshelf.quantity = current_quantity + int(detail.quantity or 0)
+            bookshelf.save()
+        except Bookshelves.DoesNotExist:
+            pass
+    
+    # Then delete the bill and its details
+    bill.delete()
+    
+    messages.success(request, 'Bill deleted successfully!')
+    
+    # If it's an AJAX request, return a simple success response
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+        
+    return redirect('bill_list')
 
-# Reservation Views
 @login_required
-def reservation_list(request):
-    reservations = Reservations.objects.all()
-    return render(request, 'reservation/list.html', {'reservations': reservations})
+def bill_scan_barcode(request):
+    """
+    View to handle barcode scanning page with simplified interface
+    """
+    # Get all books for the form
+    books = Books.objects.all()
+    customers = Customers.objects.all()
+    
+    # Context for rendering the template
+    context = {
+        'books': books,
+        'customers': customers,
+        'page_title': 'Scan Barcode',
+    }
+    
+    return render(request, 'bill/scan_barcode.html', context)
 
 @login_required
-def reservation_create(request):
+def process_barcode(request):
+    """
+    API endpoint to process barcode data
+    """
     if request.method == 'POST':
-        reservedate = request.POST.get('reservedate')
-        pickupdate = request.POST.get('pickupdate')
-        status = request.POST.get('status')
-        
-        Reservations.objects.create(
-            reservedate=reservedate,
-            pickupdate=pickupdate,
-            status=status
-        )
-        
-        messages.success(request, 'Reservation created successfully!')
-        return redirect('reservation_list')
+        try:
+            data = json.loads(request.body)
+            barcode = data.get('barcode')
+            
+            if not barcode:
+                return JsonResponse({'success': False, 'error': 'No barcode provided'})
+            
+            # Look up the book by barcode
+            try:
+                book = Books.objects.get(barcode_number=barcode)
+                authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+                categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+                
+                # Return book data
+                return JsonResponse({
+                    'success': True,
+                    'book': {
+                        'id': book.id,
+                        'description': book.description,
+                        'price': book.price,
+                        'publisher': book.id_pub.pubname if book.id_pub else None,
+                        'authors': authors,
+                        'categories': categories,
+                    }
+                })
+            except Books.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Book not found with barcode: ' + barcode})
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
     
-    return render(request, 'reservation/create.html')
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 @login_required
-def reservation_edit(request, pk):
-    reservation = get_object_or_404(Reservations, pk=pk)
+def create_bill_from_scanned(request):
+    """
+    API endpoint to create a bill from scanned books
+    """
     if request.method == 'POST':
-        reservation.reservedate = request.POST.get('reservedate')
-        reservation.pickupdate = request.POST.get('pickupdate')
-        reservation.status = request.POST.get('status')
-        reservation.save()
-        
-        messages.success(request, 'Reservation updated successfully!')
-        return redirect('reservation_list')
+        try:
+            data = json.loads(request.body)
+            customer_id = data.get('customer_id')
+            books = data.get('books', [])
+            
+            if not customer_id or not books:
+                return JsonResponse({'success': False, 'error': 'Missing required data'})
+            
+            # Get customer
+            customer = get_object_or_404(Customers, pk=customer_id)
+            
+            # Calculate total
+            total_bill = 0
+            for book_data in books:
+                total_bill += float(book_data.get('price', 0)) * int(book_data.get('quantity', 1))
+            
+            # Create bill
+            bill = Bills.objects.create(
+                id_cus=customer,
+                totalbill=total_bill
+            )
+            
+            # Create bill details
+            for book_data in books:
+                book = get_object_or_404(Books, pk=book_data.get('id'))
+                quantity = int(book_data.get('quantity', 1))
+                price = float(book_data.get('price', 0))
+                total = price * quantity
+                
+                Billdetails.objects.create(
+                    id_book=book,
+                    id_bill=bill,
+                    quantity=quantity,
+                    price=price,
+                    total=total
+                )
+                
+                # Update inventory
+                try:
+                    bookshelf = Bookshelves.objects.get(id_book=book)
+                    current_quantity = int(bookshelf.quantity or 0)
+                    if current_quantity >= quantity:
+                        bookshelf.quantity = current_quantity - quantity
+                        bookshelf.save()
+                except Bookshelves.DoesNotExist:
+                    pass
+            
+            return JsonResponse({
+                'success': True, 
+                'bill_id': bill.id,
+                'message': 'Bill created successfully'
+            })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
     
-    return render(request, 'reservation/edit.html', {'reservation': reservation})
-
-@login_required
-def reservation_delete(request, pk):
-    reservation = get_object_or_404(Reservations, pk=pk)
-    reservation.delete()
-    messages.success(request, 'Reservation deleted successfully!')
-    return redirect('reservation_list')
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 # API Views
 @login_required
 def get_book_by_barcode(request, barcode_number):
     try:
         book = Books.objects.get(barcode_number=barcode_number)
+        authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+        categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
         data = {
             'id': book.id,
             'description': book.description,
             'price': book.price,
+            'publisher': book.id_pub.pubname if book.id_pub else None,
+            'authors': authors,
+            'categories': categories,
+            'success': True
         }
         return JsonResponse(data)
     except Books.DoesNotExist:
-        return JsonResponse({'error': 'Book not found'}, status=404)
+        return JsonResponse({'success': False, 'error': 'Book not found'}, status=404)
 
 # Helper function to get database information
 def get_database_context():
@@ -936,3 +1167,373 @@ def gemini_api(request):
             })
     
     return JsonResponse({'error': 'Only POST requests are allowed'})
+
+# Area Views
+@login_required
+def area_list(request):
+    areas = Areas.objects.all()
+    template = 'area/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'area/ajax_list.html'
+        
+    return render(request, template, {'areas': areas})
+
+@login_required
+def area_create(request):
+    if request.method == 'POST':
+        areaname = request.POST.get('areaname')
+        description = request.POST.get('description')
+        Areas.objects.create(
+            areaname=areaname,
+            description=description
+        )
+        messages.success(request, 'Area created successfully!')
+        return redirect('area_list')
+    
+    template = 'area/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'area/ajax_create.html'
+        
+    return render(request, template)
+
+@login_required
+def area_edit(request, pk):
+    area = get_object_or_404(Areas, pk=pk)
+    if request.method == 'POST':
+        area.areaname = request.POST.get('areaname')
+        area.description = request.POST.get('description')
+        area.save()
+        messages.success(request, 'Area updated successfully!')
+        return redirect('area_list')
+    
+    template = 'area/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'area/ajax_edit.html'
+        
+    return render(request, template, {'area': area})
+
+@login_required
+def area_delete(request, pk):
+    area = get_object_or_404(Areas, pk=pk)
+    area.delete()
+    messages.success(request, 'Area deleted successfully!')
+    return redirect('area_list')
+
+# Shelf Views
+@login_required
+def shelf_list(request):
+    shelves = Shelves.objects.all()
+    template = 'shelf/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'shelf/ajax_list.html'
+        
+    return render(request, template, {'shelves': shelves})
+
+@login_required
+def shelf_create(request):
+    if request.method == 'POST':
+        shelfname = request.POST.get('shelfname')
+        id_area = get_object_or_404(Areas, pk=request.POST.get('id_area'))
+        Shelves.objects.create(
+            shelfname=shelfname,
+            id_area=id_area
+        )
+        messages.success(request, 'Shelf created successfully!')
+        return redirect('shelf_list')
+    
+    template = 'shelf/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'shelf/ajax_create.html'
+    
+    areas = Areas.objects.all()
+    return render(request, template, {'areas': areas})
+
+@login_required
+def shelf_edit(request, pk):
+    shelf = get_object_or_404(Shelves, pk=pk)
+    if request.method == 'POST':
+        shelf.shelfname = request.POST.get('shelfname')
+        shelf.id_area = get_object_or_404(Areas, pk=request.POST.get('id_area'))
+        shelf.save()
+        messages.success(request, 'Shelf updated successfully!')
+        return redirect('shelf_list')
+    
+    template = 'shelf/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'shelf/ajax_edit.html'
+    
+    areas = Areas.objects.all()
+    return render(request, template, {'shelf': shelf, 'areas': areas})
+
+@login_required
+def shelf_delete(request, pk):
+    shelf = get_object_or_404(Shelves, pk=pk)
+    shelf.delete()
+    messages.success(request, 'Shelf deleted successfully!')
+    return redirect('shelf_list')
+
+# Bookshelf Views (Assign Books to Shelves)
+@login_required
+def bookshelf_list(request):
+    bookshelves = Bookshelves.objects.all()
+    template = 'bookshelf/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bookshelf/ajax_list.html'
+        
+    return render(request, template, {'bookshelves': bookshelves})
+
+@login_required
+def bookshelf_create(request):
+    if request.method == 'POST':
+        id_book = get_object_or_404(Books, pk=request.POST.get('id_book'))
+        id_shelf = get_object_or_404(Shelves, pk=request.POST.get('id_shelf'))
+        quantity = request.POST.get('quantity')
+        
+        Bookshelves.objects.create(
+            id_book=id_book,
+            id_shelf=id_shelf,
+            quantity=quantity
+        )
+        
+        messages.success(request, 'Book assigned to shelf successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
+        return redirect('bookshelf_list')
+    
+    books = Books.objects.all()
+    shelves = Shelves.objects.all()
+    
+    template = 'bookshelf/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bookshelf/ajax_create.html'
+        
+    return render(request, template, {'books': books, 'shelves': shelves})
+
+@login_required
+def bookshelf_edit(request, pk):
+    bookshelf = get_object_or_404(Bookshelves, pk=pk)
+    if request.method == 'POST':
+        bookshelf.id_book = get_object_or_404(Books, pk=request.POST.get('id_book'))
+        bookshelf.id_shelf = get_object_or_404(Shelves, pk=request.POST.get('id_shelf'))
+        bookshelf.quantity = request.POST.get('quantity')
+        bookshelf.save()
+        
+        messages.success(request, 'Book shelf assignment updated successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
+        return redirect('bookshelf_list')
+    
+    books = Books.objects.all()
+    shelves = Shelves.objects.all()
+    
+    template = 'bookshelf/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'bookshelf/ajax_edit.html'
+        
+    return render(request, template, {'bookshelf': bookshelf, 'books': books, 'shelves': shelves})
+
+@login_required
+def bookshelf_delete(request, pk):
+    bookshelf = get_object_or_404(Bookshelves, pk=pk)
+    bookshelf.delete()
+    messages.success(request, 'Book shelf assignment deleted successfully!')
+    
+    # If it's an AJAX request, return a simple success response
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+        
+    return redirect('bookshelf_list')
+
+# Employee Views
+@login_required
+def employee_list(request):
+    employees = Employees.objects.all()
+    return render(request, 'employee/list.html', {'employees': employees})
+
+@login_required
+def employee_create(request):
+    if request.method == 'POST':
+        empname = request.POST.get('empname')
+        role = request.POST.get('role')
+        phone = request.POST.get('phone')
+        gender = request.POST.get('gender')
+        address = request.POST.get('address')
+        hiredate = request.POST.get('hiredate')
+        
+        # Create employee
+        employee = Employees.objects.create(
+            empname=empname,
+            role=role,
+            phone=phone,
+            gender=gender,
+            address=address,
+            hiredate=hiredate
+        )
+        
+        # Create user account
+        username = f"emp_{employee.id}"
+        password = request.POST.get('password')
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            first_name=empname
+        )
+        
+        messages.success(request, 'Employee created successfully!')
+        return redirect('employee_list')
+    
+    return render(request, 'employee/create.html')
+
+@login_required
+def employee_edit(request, pk):
+    employee = get_object_or_404(Employees, pk=pk)
+    if request.method == 'POST':
+        employee.empname = request.POST.get('empname')
+        employee.role = request.POST.get('role')
+        employee.phone = request.POST.get('phone')
+        employee.gender = request.POST.get('gender')
+        employee.address = request.POST.get('address')
+        employee.hiredate = request.POST.get('hiredate')
+        employee.save()
+        
+        messages.success(request, 'Employee updated successfully!')
+        return redirect('employee_list')
+    
+    return render(request, 'employee/edit.html', {'employee': employee})
+
+@login_required
+def employee_delete(request, pk):
+    employee = get_object_or_404(Employees, pk=pk)
+    employee.delete()
+    messages.success(request, 'Employee deleted successfully!')
+    return redirect('employee_list')
+
+# Reservation Views
+@login_required
+def reservation_list(request):
+    reservations = Reservations.objects.all()
+    return render(request, 'reservation/list.html', {'reservations': reservations})
+
+@login_required
+def reservation_create(request):
+    if request.method == 'POST':
+        reservedate = request.POST.get('reservedate')
+        pickupdate = request.POST.get('pickupdate')
+        status = request.POST.get('status')
+        
+        Reservations.objects.create(
+            reservedate=reservedate,
+            pickupdate=pickupdate,
+            status=status
+        )
+        
+        messages.success(request, 'Reservation created successfully!')
+        return redirect('reservation_list')
+    
+    return render(request, 'reservation/create.html')
+
+@login_required
+def reservation_edit(request, pk):
+    reservation = get_object_or_404(Reservations, pk=pk)
+    if request.method == 'POST':
+        reservation.reservedate = request.POST.get('reservedate')
+        reservation.pickupdate = request.POST.get('pickupdate')
+        reservation.status = request.POST.get('status')
+        reservation.save()
+        
+        messages.success(request, 'Reservation updated successfully!')
+        return redirect('reservation_list')
+    
+    return render(request, 'reservation/edit.html', {'reservation': reservation})
+
+@login_required
+def reservation_delete(request, pk):
+    reservation = get_object_or_404(Reservations, pk=pk)
+    reservation.delete()
+    messages.success(request, 'Reservation deleted successfully!')
+    return redirect('reservation_list')
+
+# Customer Views
+@login_required
+def customer_list(request):
+    customers = Customers.objects.all()
+    template = 'customer/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'customer/ajax_list.html'
+        
+    return render(request, template, {'customers': customers})
+
+@login_required
+def customer_create(request):
+    if request.method == 'POST':
+        cusname = request.POST.get('cusname')
+        gender = request.POST.get('gender')
+        phone = request.POST.get('phone')
+        
+        Customers.objects.create(
+            cusname=cusname,
+            gender=gender,
+            phone=phone
+        )
+        messages.success(request, 'Customer created successfully!')
+        return redirect('customer_list')
+    
+    template = 'customer/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'customer/ajax_create.html'
+        
+    return render(request, template)
+
+@login_required
+def customer_edit(request, pk):
+    customer = get_object_or_404(Customers, pk=pk)
+    if request.method == 'POST':
+        customer.cusname = request.POST.get('cusname')
+        customer.gender = request.POST.get('gender')
+        customer.phone = request.POST.get('phone')
+        customer.save()
+        messages.success(request, 'Customer updated successfully!')
+        return redirect('customer_list')
+    
+    template = 'customer/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'customer/ajax_edit.html'
+        
+    return render(request, template, {'customer': customer})
+
+@login_required
+def customer_delete(request, pk):
+    customer = get_object_or_404(Customers, pk=pk)
+    customer.delete()
+    messages.success(request, 'Customer deleted successfully!')
+    return redirect('customer_list')

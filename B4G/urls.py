@@ -10,6 +10,7 @@ urlpatterns = [
 
     # API endpoints
     path('api/gemini/', views.gemini_api, name='gemini_api'),
+    path('api/get_book_by_barcode/<str:barcode_number>/', views.get_book_by_barcode, name='get_book_by_barcode'),
 
     # Authentication
     path('accounts/register/', views.register, name='register'),
@@ -46,4 +47,41 @@ urlpatterns = [
     path('authors/create/', views.author_create, name='author_create'),
     path('authors/edit/<int:pk>/', views.author_edit, name='author_edit'),
     path('authors/delete/<int:pk>/', views.author_delete, name='author_delete'),
+    
+    # Areas
+    path('areas/', views.area_list, name='area_list'),
+    path('areas/create/', views.area_create, name='area_create'),
+    path('areas/edit/<int:pk>/', views.area_edit, name='area_edit'),
+    path('areas/delete/<int:pk>/', views.area_delete, name='area_delete'),
+    
+    # Shelves
+    path('shelves/', views.shelf_list, name='shelf_list'),
+    path('shelves/create/', views.shelf_create, name='shelf_create'),
+    path('shelves/edit/<int:pk>/', views.shelf_edit, name='shelf_edit'),
+    path('shelves/delete/<int:pk>/', views.shelf_delete, name='shelf_delete'),
+    
+    # Books
+    path('books/', views.book_list, name='book_list'),
+    path('books/create/', views.book_create, name='book_create'),
+    path('books/edit/<int:pk>/', views.book_edit, name='book_edit'),
+    path('books/delete/<int:pk>/', views.book_delete, name='book_delete'),
+    
+    # Book Shelf Assignments
+    path('bookshelves/', views.bookshelf_list, name='bookshelf_list'),
+    path('bookshelves/create/', views.bookshelf_create, name='bookshelf_create'),
+    path('bookshelves/edit/<int:pk>/', views.bookshelf_edit, name='bookshelf_edit'),
+    path('bookshelves/delete/<int:pk>/', views.bookshelf_delete, name='bookshelf_delete'),
+    
+    # Bills
+    path('bills/', views.bill_list, name='bill_list'),
+    path('bills/create/', views.bill_create, name='bill_create'),
+    path('bills/edit/<int:pk>/', views.bill_edit, name='bill_edit'),
+    path('bills/delete/<int:pk>/', views.bill_delete, name='bill_delete'),
+    path('bills/scan-barcode/', views.bill_scan_barcode, name='bill_scan_barcode'),
+    
+    # Customers
+    path('customers/', views.customer_list, name='customer_list'),
+    path('customers/create/', views.customer_create, name='customer_create'),
+    path('customers/edit/<int:pk>/', views.customer_edit, name='customer_edit'),
+    path('customers/delete/<int:pk>/', views.customer_delete, name='customer_delete'),
 ] 

@@ -1,0 +1,88 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Assign Book to Shelf</h3>
+    <div class="card-tools">
+      <a href="{% url 'bookshelf_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="bookshelf-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_book">Book</label>
+        <select class="form-control" id="id_book" name="id_book" required>
+          <option value="">Select a Book</option>
+          {% for book in books %}
+          <option value="{{ book.id }}">{{ book.description }} (Publisher: {{ book.id_pub.pubname }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="id_shelf">Shelf</label>
+        <select class="form-control" id="id_shelf" name="id_shelf" required>
+          <option value="">Select a Shelf</option>
+          {% for shelf in shelves %}
+          <option value="{{ shelf.id }}">{{ shelf.shelfname }} (Area: {{ shelf.id_area.areaname }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="quantity">Quantity</label>
+        <input
+          type="number"
+          class="form-control"
+          id="quantity"
+          name="quantity"
+          min="1"
+          value="1"
+          required
+        />
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+      <a href="{% url 'bookshelf_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<script>
+  $(function () {
+    // Handle form submission
+    $("#bookshelf-form").on("submit", function(e) {
+      e.preventDefault();
+      
+      let formData = {
+        id_book: $("#id_book").val(),
+        id_shelf: $("#id_shelf").val(),
+        quantity: $("#quantity").val(),
+        csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val()
+      };
+      
+      $.ajax({
+        url: "{% url 'bookshelf_create' %}",
+        type: "POST",
+        data: formData,
+        success: function(data) {
+          // Redirect to list page
+          loadContent("{% url 'bookshelf_list' %}");
+          // Show success message
+          toastr.success("Book assigned to shelf successfully!");
+        },
+        error: function(xhr, status, error) {
+          toastr.error("An error occurred while assigning the book to shelf.");
+        }
+      });
+    });
+    
+    // Handle AJAX links
+    $(".ajax-link").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      loadContent(url);
+    });
+  });
+</script> 

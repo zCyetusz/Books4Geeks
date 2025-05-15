@@ -1,0 +1,102 @@
+<!-- AJAX version of customer create -->
+<div class="content-header">
+  <div class="container-fluid">
+    <div class="row mb-2">
+      <div class="col-sm-6">
+        <h1>Create Customer</h1>
+      </div>
+      <div class="col-sm-6">
+        <ol class="breadcrumb float-sm-right">
+          <li class="breadcrumb-item"><a href="/" class="ajax-link">Home</a></li>
+          <li class="breadcrumb-item">
+            <a href="{% url 'customer_list' %}" class="ajax-link">Customers</a>
+          </li>
+          <li class="breadcrumb-item active">Create</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Main content -->
+<section class="content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Add New Customer</h3>
+          </div>
+          <!-- /.card-header -->
+          <div class="card-body">
+            <form method="post" id="customerForm">
+              {% csrf_token %}
+              <div class="form-group">
+                <label for="cusname">Customer Name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="cusname"
+                  name="cusname"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="gender">Gender</label>
+                <select class="form-control" id="gender" name="gender">
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="phone"
+                  name="phone"
+                />
+              </div>
+              <button type="submit" class="btn btn-primary">Submit</button>
+              <a href="{% url 'customer_list' %}" class="btn btn-secondary ajax-link"
+                >Cancel</a
+              >
+            </form>
+          </div>
+          <!-- /.card-body -->
+        </div>
+        <!-- /.card -->
+      </div>
+      <!-- /.col -->
+    </div>
+    <!-- /.row -->
+  </div>
+  <!-- /.container-fluid -->
+</section>
+
+<script>
+  $(function() {
+    // Handle form submission via AJAX
+    $("#customerForm").submit(function(e) {
+      e.preventDefault();
+      
+      $.ajax({
+        type: "POST",
+        url: "{% url 'customer_create' %}",
+        data: $(this).serialize(),
+        success: function(response) {
+          // Redirect to customer list on success
+          loadPage("{% url 'customer_list' %}");
+          // Show success message
+          showToast('Success', 'Customer created successfully!', 'success');
+        },
+        error: function(xhr, status, error) {
+          // Show error message
+          showToast('Error', 'Failed to create customer. Please try again.', 'error');
+        }
+      });
+    });
+  });
+</script> 

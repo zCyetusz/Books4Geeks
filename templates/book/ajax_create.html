@@ -1,0 +1,125 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Create Book</h3>
+    <div class="card-tools">
+      <a href="{% url 'book_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to List
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="book-form">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="description">Description</label>
+        <input
+          type="text"
+          class="form-control"
+          id="description"
+          name="description"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="price">Price</label>
+        <input
+          type="text"
+          class="form-control"
+          id="price"
+          name="price"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="publishdate">Publish Date</label>
+        <input
+          type="date"
+          class="form-control"
+          id="publishdate"
+          name="publishdate"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="id_pub">Publisher</label>
+        <select class="form-control" id="id_pub" name="id_pub" required>
+          <option value="">Select a Publisher</option>
+          {% for publisher in publishers %}
+          <option value="{{ publisher.id }}">{{ publisher.pubname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="authors">Authors</label>
+        <select class="form-control select2" id="authors" name="authors[]" multiple>
+          {% for author in authors %}
+          <option value="{{ author.id }}">{{ author.authorname }}</option>
+          {% endfor %}
+        </select>
+        <small class="form-text text-muted">You can select multiple authors</small>
+      </div>
+      <div class="form-group">
+        <label for="categories">Categories</label>
+        <select class="form-control select2" id="categories" name="categories[]" multiple>
+          {% for category in categories %}
+          <option value="{{ category.id }}">{{ category.catname }}</option>
+          {% endfor %}
+        </select>
+        <small class="form-text text-muted">You can select multiple categories</small>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+      <a href="{% url 'book_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<script>
+  $(function () {
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      allowClear: true,
+      placeholder: "Select options..."
+    });
+    
+    // Handle form submission
+    $("#book-form").on("submit", function(e) {
+      e.preventDefault();
+      
+      let formData = {
+        description: $("#description").val(),
+        price: $("#price").val(),
+        publishdate: $("#publishdate").val(),
+        id_pub: $("#id_pub").val(),
+        authors: $("#authors").val(),
+        categories: $("#categories").val(),
+        csrfmiddlewaretoken: $("input[name=csrfmiddlewaretoken]").val()
+      };
+      
+      $.ajax({
+        url: "{% url 'book_create' %}",
+        type: "POST",
+        data: formData,
+        success: function(data) {
+          // Redirect to list page
+          loadContent("{% url 'book_list' %}");
+          // Show success message
+          toastr.success("Book created successfully!");
+        },
+        error: function(xhr, status, error) {
+          toastr.error("An error occurred while creating the book.");
+        }
+      });
+    });
+    
+    // Handle AJAX links
+    $(".ajax-link").on("click", function(e) {
+      e.preventDefault();
+      let url = $(this).attr("href");
+      loadContent(url);
+    });
+  });
+</script> 

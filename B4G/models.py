@@ -73,6 +73,7 @@ class Books(models.Model):
 
     #__Books_FIELDS__
     id_pub = models.ForeignKey(Publishers, on_delete=models.CASCADE)
+    bookname = models.TextField(max_length=255, null=True, blank=True)
     publishdate = models.DateTimeField(blank=True, null=True, default=timezone.now)
     price = models.TextField(max_length=255, null=True, blank=True)
     description = models.TextField(max_length=255, null=True, blank=True)
@@ -169,6 +170,9 @@ class Billdetails(models.Model):
 
     #__Billdetails_FIELDS__
     id_book = models.ForeignKey(Books, on_delete=models.CASCADE)
+    id_bill = models.ForeignKey(Bills, on_delete=models.CASCADE)
+    quantity = models.IntegerField(null=True, blank=True, default=1)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     total = models.TextField(max_length=255, null=True, blank=True)
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 

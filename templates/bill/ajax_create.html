@@ -1,0 +1,237 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Create New Bill</h3>
+    <div class="card-tools">
+      <a href="{% url 'bill_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to Bills
+      </a>
+      <a href="{% url 'bill_scan_barcode' %}" class="btn btn-success btn-sm ajax-link">
+        <i class="fas fa-barcode"></i> Scan Barcode
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="ajaxBillForm" method="POST">
+      {% csrf_token %}
+
+      <!-- Customer Selection -->
+      <div class="form-group">
+        <label for="id_cus">Customer</label>
+        <select class="form-control select2" id="id_cus" name="id_cus" required>
+          <option value="">Select a customer</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}">{{ customer.cusname }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Books Container -->
+      <div class="card card-primary">
+        <div class="card-header">
+          <h3 class="card-title">Books</h3>
+          <div class="card-tools">
+            <button type="button" id="addBookBtn" class="btn btn-sm btn-success">
+              <i class="fas fa-plus"></i> Add Book
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="booksContainer">
+            <!-- Empty container that will be filled with book rows -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Total Bill -->
+      <div class="form-group">
+        <label for="totalbill">Total Bill</label>
+        <div class="input-group">
+          <div class="input-group-prepend">
+            <span class="input-group-text">$</span>
+          </div>
+          <input type="number" class="form-control" id="totalbill" name="totalbill" readonly>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> Create Bill
+        </button>
+        <a href="{% url 'bill_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+      </div>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<!-- Book Template -->
+<template id="bookRowTemplate">
+  <div class="book-row">
+    <div class="row">
+      <div class="col-md-5">
+        <div class="form-group">
+          <label>Book</label>
+          <select class="form-control select2 book-select" name="book_ids[]" required>
+            <option value="">Select a book</option>
+            {% for book in books %}
+            <option value="{{ book.id }}" data-price="{{ book.price }}">{{ book.description }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="form-group">
+          <label>Price</label>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">$</span>
+            </div>
+            <input type="number" step="0.01" class="form-control book-price" name="prices[]" required>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" class="form-control book-quantity" name="quantities[]" min="1" value="1" required>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="form-group">
+          <label>Total</label>
+          <div class="input-group">
+            <div class="input-group-prepend">
+              <span class="input-group-text">$</span>
+            </div>
+            <input type="number" step="0.01" class="form-control book-total" readonly>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-1">
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button type="button" class="btn btn-danger btn-block remove-book">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style>
+  .book-row {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+  }
+  .remove-book {
+    cursor: pointer;
+  }
+</style>
+
+<script>
+  $(function () {
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4'
+    });
+    
+    // Add a new book row
+    $('#addBookBtn').on('click', function() {
+      addBookRow();
+    });
+    
+    // Remove a book row
+    $(document).on('click', '.remove-book', function() {
+      $(this).closest('.book-row').remove();
+      calculateTotal();
+    });
+    
+    // Recalculate when book is selected
+    $(document).on('change', '.book-select', function() {
+      var row = $(this).closest('.book-row');
+      var price = $(this).find('option:selected').data('price') || 0;
+      row.find('.book-price').val(price);
+      calculateRowTotal(row);
+    });
+    
+    // Recalculate when price or quantity changes
+    $(document).on('input', '.book-price, .book-quantity', function() {
+      calculateRowTotal($(this).closest('.book-row'));
+    });
+    
+    // Initialize with one book row
+    addBookRow();
+    
+    // AJAX form submission
+    $('#ajaxBillForm').on('submit', function(e) {
+      e.preventDefault();
+      
+      if ($('.book-row').length === 0) {
+        alert('Please add at least one book to the bill.');
+        return false;
+      }
+      
+      var formData = $(this).serialize();
+      
+      $.ajax({
+        url: "{% url 'bill_create' %}",
+        type: 'POST',
+        data: formData,
+        headers: {'X-Requested-With': 'XMLHttpRequest'},
+        success: function(response) {
+          if (response.status === 'success') {
+            // Redirect to bills list
+            loadContent("{% url 'bill_list' %}");
+          }
+        },
+        error: function(error) {
+          console.error("Error creating bill:", error);
+          alert('An error occurred while creating the bill.');
+        }
+      });
+    });
+    
+    // Make sure all ajax-link elements use AJAX navigation
+    $(document).on('click', '.ajax-link', function(e) {
+      e.preventDefault();
+      var url = $(this).attr('href');
+      loadContent(url);
+    });
+  });
+  
+  // Function to add a new book row
+  function addBookRow() {
+    var template = document.getElementById('bookRowTemplate');
+    var bookRow = template.content.cloneNode(true);
+    $('#booksContainer').append(bookRow);
+    
+    // Initialize Select2 for the newly added row
+    $('.book-select').last().select2({
+      theme: 'bootstrap4'
+    });
+  }
+  
+  // Calculate row total
+  function calculateRowTotal(row) {
+    var price = parseFloat(row.find('.book-price').val()) || 0;
+    var quantity = parseInt(row.find('.book-quantity').val()) || 1;
+    var total = price * quantity;
+    row.find('.book-total').val(total.toFixed(2));
+    calculateTotal();
+  }
+  
+  // Calculate grand total
+  function calculateTotal() {
+    var total = 0;
+    $('.book-total').each(function() {
+      total += parseFloat($(this).val()) || 0;
+    });
+    $('#totalbill').val(total.toFixed(2));
+  }
+</script> 

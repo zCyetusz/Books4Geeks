@@ -1,0 +1,87 @@
+{% extends 'layouts/base.html' %} {% load static %} {% block title %} Assign Book to Shelf {% endblock title %} {% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Assign Book to Shelf</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item">
+              <a href="{% url 'bookshelf_list' %}">Book Shelf Assignments</a>
+            </li>
+            <li class="breadcrumb-item active">Create</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Assign a Book to a Shelf</h3>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="id_book">Book</label>
+                  <select class="form-control" id="id_book" name="id_book" required>
+                    <option value="">Select a Book</option>
+                    {% for book in books %}
+                    <option value="{{ book.id }}">{{ book.description }} (Publisher: {{ book.id_pub.pubname }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="id_shelf">Shelf</label>
+                  <select class="form-control" id="id_shelf" name="id_shelf" required>
+                    <option value="">Select a Shelf</option>
+                    {% for shelf in shelves %}
+                    <option value="{{ shelf.id }}">{{ shelf.shelfname }} (Area: {{ shelf.id_area.areaname }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="quantity">Quantity</label>
+                  <input
+                    type="number"
+                    class="form-control"
+                    id="quantity"
+                    name="quantity"
+                    min="1"
+                    value="1"
+                    required
+                  />
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+                <a href="{% url 'bookshelf_list' %}" class="btn btn-secondary"
+                  >Cancel</a
+                >
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock content %} 
