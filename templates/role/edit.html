@@ -1,0 +1,171 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %} Edit Role {% endblock title %}
+
+{% block stylesheets %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<style>
+  .permission-section {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+  }
+  .permission-section .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #ddd;
+  }
+  .permission-checkbox {
+    margin-right: 10px;
+  }
+  .select-all-link {
+    margin-left: 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Edit Role: {{ group.name }}</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'role_list' %}">Roles</a></li>
+            <li class="breadcrumb-item active">Edit</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Edit Role</h3>
+              <div class="card-tools">
+                <a href="{% url 'role_list' %}" class="btn btn-default">
+                  <i class="fas fa-arrow-left"></i> Back to Roles
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="name">Role Name</label>
+                  <input type="text" class="form-control" id="name" name="name" value="{{ group.name }}" required>
+                </div>
+                
+                <h4 class="mt-4">Permissions</h4>
+                <div class="alert alert-info">
+                  <i class="fas fa-info-circle"></i> Update the permissions for this role.
+                  Currently, this role has {{ group.permissions.count }} permissions assigned.
+                </div>
+                
+                <div class="row">
+                  {% for model_name, perms in permissions_by_model.items %}
+                    <div class="col-md-6 mb-3">
+                      <div class="card">
+                        <div class="card-header bg-light">
+                          <div class="d-flex align-items-center">
+                            <h5 class="mb-0 text-capitalize flex-grow-1">{{ model_name }}</h5>
+                            <div class="custom-control custom-checkbox">
+                              <input type="checkbox" class="custom-control-input select-all" id="select-all-{{ forloop.counter }}" 
+                                     data-section="{{ forloop.counter }}">
+                              <label class="custom-control-label" for="select-all-{{ forloop.counter }}">Select All</label>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="card-body" id="section-{{ forloop.counter }}">
+                          {% for perm in perms %}
+                            <div class="custom-control custom-checkbox">
+                              <input type="checkbox" class="custom-control-input perm-checkbox" 
+                                     name="permissions[]" 
+                                     value="{{ perm.id }}" 
+                                     id="perm-{{ perm.id }}"
+                                     data-section="{{ forloop.parentloop.counter }}"
+                                     {% if perm.id in group_permissions %}checked{% endif %}>
+                              <label class="custom-control-label" for="perm-{{ perm.id }}">
+                                {{ perm.name }}
+                              </label>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+                
+                <button type="submit" class="btn btn-primary mt-4">
+                  <i class="fas fa-save"></i> Update Role
+                </button>
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock content %}
+
+{% block javascripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<script>
+  $(function() {
+    // Handle "Select All" checkboxes
+    $('.select-all').on('change', function() {
+      var section = $(this).data('section');
+      var isChecked = $(this).prop('checked');
+      
+      // Select or deselect all checkboxes in this section
+      $('.perm-checkbox[data-section="' + section + '"]').prop('checked', isChecked);
+    });
+    
+    // Update "Select All" checkbox when individual permissions are changed
+    $('.perm-checkbox').on('change', function() {
+      var section = $(this).data('section');
+      var totalCheckboxes = $('.perm-checkbox[data-section="' + section + '"]').length;
+      var checkedCheckboxes = $('.perm-checkbox[data-section="' + section + '"]:checked').length;
+      
+      // Update the "Select All" checkbox state
+      $('#select-all-' + section).prop('checked', totalCheckboxes === checkedCheckboxes);
+    });
+    
+    // Initialize "Select All" checkboxes based on initial state
+    $('.select-all').each(function() {
+      var section = $(this).data('section');
+      var totalCheckboxes = $('.perm-checkbox[data-section="' + section + '"]').length;
+      var checkedCheckboxes = $('.perm-checkbox[data-section="' + section + '"]:checked').length;
+      
+      // Set the "Select All" checkbox state
+      $(this).prop('checked', totalCheckboxes === checkedCheckboxes && totalCheckboxes > 0);
+    });
+  });
+</script>
+{% endblock javascripts %} 

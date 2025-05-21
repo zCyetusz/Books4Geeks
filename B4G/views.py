@@ -1,11 +1,11 @@
 from B4G.forms import LoginForm, RegistrationForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm
 from django.contrib.auth import logout
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Q
+from django.db.models import Q, Count
 from .models import *
 import barcode
 from barcode.writer import ImageWriter
@@ -19,6 +19,17 @@ import requests
 from django.views.decorators.csrf import csrf_exempt
 import google.generativeai as genai
 from django.db.models import Count
+import cv2
+from pyzbar.pyzbar import decode
+import numpy as np
+import threading
+import time
+from django.apps import apps
+from django.core import serializers
+from datetime import datetime
+from django.utils import timezone as django_timezone
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 # Create your views here.
 
@@ -26,7 +37,7 @@ from django.db.models import Count
 def register(request):
   if request.method == 'POST':
     form = RegistrationForm(request.POST)
-    if form.is_valid():
+    if form.is_saved():
       form.save()
       print('Account created successfully!')
       return redirect('/accounts/login/')
@@ -332,6 +343,7 @@ def book_create(request):
         
         book = Books.objects.create(
             id_pub=id_pub,
+            bookname=bookname,
             publishdate=publishdate,
             price=price,
             description=description
@@ -357,8 +369,8 @@ def book_create(request):
         
         # Generate barcode - EAN-13 requires 12 digits (13th is check digit)
         # Use a prefix (e.g., 978 for books) and pad with zeros
-        barcode_number = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
-        ean = barcode.get('ean13', barcode_number, writer=ImageWriter())
+        barcode_base = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
+        ean = barcode.get('ean13', barcode_base, writer=ImageWriter())
         buffer = BytesIO()
         ean.write(buffer)
         
@@ -370,8 +382,8 @@ def book_create(request):
         filename = f'barcode_{book.id}.png'
         file_path = os.path.join('barcodes', filename)
         
-        # Set barcode number
-        book.barcode_number = barcode_number
+        # Set barcode number to the FULL 13-digit code (including check digit)
+        book.barcode_number = str(ean)
         
         # Save barcode file to the barcode directory
         book.barcode.save(file_path, File(buffer), save=True)
@@ -437,8 +449,8 @@ def book_edit(request, pk):
         if not book.barcode or not book.barcode_number:
             # Generate barcode - EAN-13 requires 12 digits (13th is check digit)
             # Use a prefix (e.g., 978 for books) and pad with zeros
-            barcode_number = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
-            ean = barcode.get('ean13', barcode_number, writer=ImageWriter())
+            barcode_base = f"978{book.id:09d}"  # 978 + 9 digits padded with zeros
+            ean = barcode.get('ean13', barcode_base, writer=ImageWriter())
             buffer = BytesIO()
             ean.write(buffer)
             
@@ -450,8 +462,8 @@ def book_edit(request, pk):
             filename = f'barcode_{book.id}.png'
             file_path = os.path.join('barcodes', filename)
             
-            # Set barcode number
-            book.barcode_number = barcode_number
+            # Set barcode number to the FULL 13-digit code (including check digit)
+            book.barcode_number = str(ean)
             
             # Save barcode file to the barcode directory
             book.barcode.save(file_path, File(buffer), save=True)
@@ -739,11 +751,15 @@ def bill_scan_barcode(request):
     books = Books.objects.all()
     customers = Customers.objects.all()
     
+    # Check if there are desktop-scanned books in the session
+    desktop_scanned_books = request.session.pop('desktop_scanned_books', None)
+    
     # Context for rendering the template
     context = {
         'books': books,
         'customers': customers,
         'page_title': 'Scan Barcode',
+        'desktop_scanned_books': desktop_scanned_books
     }
     
     return render(request, 'bill/scan_barcode.html', context)
@@ -764,8 +780,10 @@ def process_barcode(request):
             # Look up the book by barcode
             try:
                 book = Books.objects.get(barcode_number=barcode)
-                authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
-                categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+                
+                # Get related information with prefetch to optimize database queries
+                authors = Bookauthors.objects.filter(id_book=book).select_related('id_author')
+                categories = Bookcategories.objects.filter(id_book=book).select_related('id_cat')
                 
                 # Return book data
                 return JsonResponse({
@@ -775,17 +793,19 @@ def process_barcode(request):
                         'description': book.description,
                         'price': book.price,
                         'publisher': book.id_pub.pubname if book.id_pub else None,
-                        'authors': authors,
-                        'categories': categories,
+                        'authors': [ba.id_author.authorname for ba in authors],
+                        'categories': [bc.id_cat.catname for bc in categories],
                     }
                 })
             except Books.DoesNotExist:
-                return JsonResponse({'success': False, 'error': 'Book not found with barcode: ' + barcode})
+                return JsonResponse({'success': False, 'error': f'Book not found with barcode: {barcode}'})
                 
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid JSON data'})
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
     
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+    return JsonResponse({'success': False, 'error': 'Only POST requests are allowed'})
 
 @login_required
 def create_bill_from_scanned(request):
@@ -1102,72 +1122,6 @@ def execute_custom_query(query):
     except Exception as e:
         return {"error": str(e)}
 
-@csrf_exempt
-def gemini_api(request):
-    """
-    View to handle Gemini API requests from the chatbot using the official Google genai client
-    """
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            user_message = data.get('message', '')
-            
-            # Configure the Gemini API
-            api_key = "AIzaSyCU0QEQYbgD5k44SC5D5J_A1RYVa_CQQ1M"
-            genai.configure(api_key=api_key)
-            
-            # Create context about the Books4Geeks application
-            system_prompt = "You are an AI assistant for the Books4Geeks application, a Django web app for managing books, authors, publishers, and categories. Keep responses helpful, concise, and focused on the application's features. The application has sections for Books, Authors, Publishers, Categories, and user management."
-            
-            # Add database context
-            db_context = get_database_context()
-            system_prompt += f"\n\nHere is the current database information that you should use to answer questions:\n{db_context}"
-            
-            # Check if the query is asking for specific database information
-            specific_data = handle_db_query(user_message)
-            if specific_data and len(specific_data) > 0:
-                system_prompt += f"\n\nThe user is asking about database records. Here is specific data related to their query: {json.dumps(specific_data)}"
-            
-            # Execute custom query for more complex questions
-            custom_data = execute_custom_query(user_message)
-            if custom_data and len(custom_data) > 0:
-                system_prompt += f"\n\nHere is detailed information related to the user's specific query: {json.dumps(custom_data)}"
-            
-            # Log what we're sending to Gemini
-            print(f"System prompt with database context: {system_prompt}")
-            
-            # Access the model and configure it
-            model = genai.GenerativeModel(
-                model_name="gemini-2.0-flash",
-                system_instruction=system_prompt,
-                generation_config={
-                    "temperature": 0.7,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                    "max_output_tokens": 1024,
-                }
-            )
-            
-            # Generate content
-            response = model.generate_content(user_message)
-            
-            # Check if the response has text
-            if hasattr(response, 'text'):
-                return JsonResponse({'response': response.text})
-            else:
-                return JsonResponse({
-                    'response': 'Sorry, I could not generate a response at this time.',
-                    'error': 'Invalid response structure'
-                })
-                
-        except Exception as e:
-            return JsonResponse({
-                'response': 'Sorry, an error occurred while processing your request.',
-                'error': str(e)
-            })
-    
-    return JsonResponse({'error': 'Only POST requests are allowed'})
-
 # Area Views
 @login_required
 def area_list(request):
@@ -1432,51 +1386,6 @@ def employee_delete(request, pk):
     messages.success(request, 'Employee deleted successfully!')
     return redirect('employee_list')
 
-# Reservation Views
-@login_required
-def reservation_list(request):
-    reservations = Reservations.objects.all()
-    return render(request, 'reservation/list.html', {'reservations': reservations})
-
-@login_required
-def reservation_create(request):
-    if request.method == 'POST':
-        reservedate = request.POST.get('reservedate')
-        pickupdate = request.POST.get('pickupdate')
-        status = request.POST.get('status')
-        
-        Reservations.objects.create(
-            reservedate=reservedate,
-            pickupdate=pickupdate,
-            status=status
-        )
-        
-        messages.success(request, 'Reservation created successfully!')
-        return redirect('reservation_list')
-    
-    return render(request, 'reservation/create.html')
-
-@login_required
-def reservation_edit(request, pk):
-    reservation = get_object_or_404(Reservations, pk=pk)
-    if request.method == 'POST':
-        reservation.reservedate = request.POST.get('reservedate')
-        reservation.pickupdate = request.POST.get('pickupdate')
-        reservation.status = request.POST.get('status')
-        reservation.save()
-        
-        messages.success(request, 'Reservation updated successfully!')
-        return redirect('reservation_list')
-    
-    return render(request, 'reservation/edit.html', {'reservation': reservation})
-
-@login_required
-def reservation_delete(request, pk):
-    reservation = get_object_or_404(Reservations, pk=pk)
-    reservation.delete()
-    messages.success(request, 'Reservation deleted successfully!')
-    return redirect('reservation_list')
-
 # Customer Views
 @login_required
 def customer_list(request):
@@ -1501,6 +1410,7 @@ def customer_create(request):
             gender=gender,
             phone=phone
         )
+        
         messages.success(request, 'Customer created successfully!')
         return redirect('customer_list')
     
@@ -1520,6 +1430,7 @@ def customer_edit(request, pk):
         customer.gender = request.POST.get('gender')
         customer.phone = request.POST.get('phone')
         customer.save()
+        
         messages.success(request, 'Customer updated successfully!')
         return redirect('customer_list')
     
@@ -1537,3 +1448,893 @@ def customer_delete(request, pk):
     customer.delete()
     messages.success(request, 'Customer deleted successfully!')
     return redirect('customer_list')
+
+# Reservation Views
+@login_required
+def reservation_list(request):
+    # Get all reservations with prefetched related data for better performance
+    reservations = Reservations.objects.all().select_related('id_cus')
+    
+    # Prepare data for display
+    reservation_data = []
+    for reservation in reservations:
+        # Get all books for this reservation
+        items = ReservationItems.objects.filter(id_reservation=reservation).select_related('id_book')
+        books = [item.id_book for item in items]
+        
+        reservation_data.append({
+            'reservation': reservation,
+            'books': books,
+            'customer_name': reservation.id_cus.cusname if reservation.id_cus else "Unknown",
+            'book_count': len(books),
+            'book_names': ", ".join([book.description for book in books])
+        })
+    
+    template = 'reservation/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'reservation/ajax_list.html'
+        
+    return render(request, template, {'reservation_data': reservation_data})
+
+@login_required
+def reservation_create(request):
+    if request.method == 'POST':
+        id_cus = get_object_or_404(Customers, pk=request.POST.get('id_cus'))
+        book_ids = request.POST.getlist('book_ids[]')
+        pickupdate = request.POST.get('pickupdate')
+        status = request.POST.get('status', 'Pending')
+        
+        # Import Django's timezone locally to avoid conflicts
+        from django.utils import timezone as django_timezone
+        
+        # Create a single reservation for all selected books
+        reservation = Reservations.objects.create(
+            id_cus=id_cus,
+            reservedate=django_timezone.now(),
+            pickupdate=pickupdate,
+            status=status
+        )
+        
+        # Add all selected books as reservation items
+        for book_id in book_ids:
+            book = get_object_or_404(Books, pk=book_id)
+            ReservationItems.objects.create(
+                id_reservation=reservation,
+                id_book=book
+            )
+        
+        messages.success(request, 'Reservation created successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
+        return redirect('reservation_list')
+    
+    customers = Customers.objects.all()
+    books = Books.objects.all()
+    
+    template = 'reservation/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'reservation/ajax_create.html'
+        
+    return render(request, template, {
+        'customers': customers,
+        'books': books
+    })
+
+@login_required
+def reservation_edit(request, pk):
+    reservation = get_object_or_404(Reservations, pk=pk)
+    reservation_items = ReservationItems.objects.filter(id_reservation=reservation)
+    
+    if request.method == 'POST':
+        # Update customer and general reservation details
+        reservation.id_cus = get_object_or_404(Customers, pk=request.POST.get('id_cus'))
+        reservation.pickupdate = request.POST.get('pickupdate')
+        reservation.status = request.POST.get('status')
+        reservation.save()
+        
+        # Get the list of books to include
+        book_ids = request.POST.getlist('book_ids[]')
+        
+        # Remove all existing book items
+        reservation_items.delete()
+        
+        # Create new book items
+        for book_id in book_ids:
+            book = get_object_or_404(Books, pk=book_id)
+            ReservationItems.objects.create(
+                id_reservation=reservation,
+                id_book=book
+            )
+        
+        messages.success(request, 'Reservation updated successfully!')
+        
+        # If it's an AJAX request, return a simple success response
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'success'})
+            
+        return redirect('reservation_list')
+    
+    customers = Customers.objects.all()
+    books = Books.objects.all()
+    
+    # Get current books for pre-selecting in the form
+    reserved_books = [item.id_book.id for item in reservation_items]
+    
+    template = 'reservation/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'reservation/ajax_edit.html'
+        
+    return render(request, template, {
+        'reservation': reservation,
+        'customers': customers,
+        'books': books,
+        'reserved_books': reserved_books
+    })
+
+@login_required
+def reservation_delete(request, pk):
+    reservation = get_object_or_404(Reservations, pk=pk)
+    reservation.delete()
+    messages.success(request, 'Reservation deleted successfully!')
+    
+    # If it's an AJAX request, return a simple success response
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+        
+    return redirect('reservation_list')
+
+@login_required
+def customer_reservations(request, customer_id):
+    """
+    View to show all reservations for a specific customer
+    """
+    customer = get_object_or_404(Customers, pk=customer_id)
+    reservations = Reservations.objects.filter(id_cus=customer)
+    
+    template = 'reservation/customer_reservations.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'reservation/ajax_customer_reservations.html'
+        
+    return render(request, template, {
+        'customer': customer,
+        'reservations': reservations
+    })
+
+# Global variables for camera
+camera = None
+camera_thread = None
+is_camera_running = False
+
+def generate_frames():
+    global camera, is_camera_running
+    while is_camera_running:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            # Try to decode barcodes
+            for barcode in decode(frame):
+                barcode_data = barcode.data.decode('utf-8')
+                barcode_type = barcode.type
+                (x, y, w, h) = barcode.rect
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                text = f"{barcode_data} ({barcode_type})"
+                cv2.putText(frame, text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                # You can also process the barcode here (e.g., lookup in DB)
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            time.sleep(0.1)
+
+@login_required
+def start_camera(request):
+    """
+    View to handle camera access for barcode scanning
+    """
+    global camera, camera_thread, is_camera_running
+    
+    if request.method == 'POST':
+        try:
+            if not is_camera_running:
+                # Initialize camera
+                camera = cv2.VideoCapture(0)
+                camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                
+                if not camera.isOpened():
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Could not open camera'
+                    })
+                
+                is_camera_running = True
+                
+                # Start camera thread
+                camera_thread = threading.Thread(target=generate_frames)
+                camera_thread.daemon = True
+                camera_thread.start()
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Camera started successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Camera is already running'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    })
+
+@login_required
+def stop_camera(request):
+    """
+    View to stop camera access
+    """
+    global camera, is_camera_running
+    
+    if request.method == 'POST':
+        try:
+            if is_camera_running and camera is not None:
+                is_camera_running = False
+                camera.release()
+                cv2.destroyAllWindows()
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Camera stopped successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Camera is not running'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Invalid request method'
+    })
+
+@login_required
+def video_feed(request):
+    return StreamingHttpResponse(generate_frames(),
+                                content_type='multipart/x-mixed-replace; boundary=frame')
+
+@login_required
+def scan_barcode_desktop(request):
+    """
+    Desktop barcode scanner for Books4Geeks.
+    Opens camera window on server, scans books, and adds them to the session.
+    """
+    try:
+        # Initialize camera
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            messages.error(request, "Could not open camera. Please check your hardware settings.")
+            return redirect('bill_scan_barcode')
+            
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
+        # Keep track of scanned books
+        scanned_books = []
+        scanned_barcodes = set()
+        
+        print("Starting barcode scanner...")
+        print("Press 'c' to complete scanning and return to the web interface.")
+        
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+                
+            # Process frame for barcodes
+            for barcode in decode(frame):
+                barcode_data = barcode.data.decode('utf-8')
+                
+                # Draw rectangle around barcode
+                (x, y, w, h) = barcode.rect
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                
+                # Check if this is a new barcode
+                if barcode_data not in scanned_barcodes:
+                    try:
+                        # Look up the book
+                        book = Books.objects.get(barcode_number=barcode_data)
+                        
+                        # Get author and category information
+                        authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+                        categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+                        
+                        # Add to scanned books
+                        scanned_books.append({
+                            'id': book.id,
+                            'description': book.description,
+                            'price': str(book.price),
+                            'quantity': 1,
+                            'publisher': book.id_pub.pubname if book.id_pub else None,
+                            'authors': authors,
+                            'categories': categories,
+                            'scanned_by': 'camera'
+                        })
+                        
+                        # Mark as processed
+                        scanned_barcodes.add(barcode_data)
+                        
+                        # Show success message on frame
+                        success_text = f"Added: {book.description}"
+                        cv2.putText(frame, success_text, (10, 30), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        
+                        print(f"Book scanned: {book.description}")
+                        
+                    except Books.DoesNotExist:
+                        # Show error on frame
+                        error_text = f"Not found: {barcode_data}"
+                        cv2.putText(frame, error_text, (10, 30), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        
+                        print(f"Book not found: {barcode_data}")
+                
+                # Always show the barcode text
+                cv2.putText(frame, barcode_data, (x, y - 10), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            
+            # Show book count
+            count_text = f"Books: {len(scanned_books)}"
+            cv2.putText(frame, count_text, (10, frame.shape[0] - 10), 
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+            
+            # Display the frame
+            cv2.imshow("Books4Geeks Barcode Scanner", frame)
+            
+            # Break if 'c' is pressed or window is closed
+            key = cv2.waitKey(10) 
+            if key == ord('c') or key == 27:  # 'c' or ESC key
+                break
+        
+        # Clean up
+        cap.release()
+        cv2.destroyAllWindows()
+        
+        # Store scanned books in session
+        if scanned_books:
+            request.session['desktop_scanned_books'] = scanned_books
+            messages.success(request, f"Successfully scanned {len(scanned_books)} books")
+        else:
+            messages.info(request, "No books were scanned")
+        
+    except Exception as e:
+        messages.error(request, f"Error during barcode scanning: {str(e)}")
+    
+    # Always redirect back to the scan_barcode page
+    return redirect('bill_scan_barcode')
+
+def export_full_database(changed_model=None):
+    """
+    Exports the ENTIRE database to JSON files for AI consumption,
+    with optimization for frequent updates
+    
+    Args:
+        changed_model: If provided, only this model will be re-exported
+    """
+    # Create data directory if it doesn't exist
+    data_dir = os.path.join(settings.BASE_DIR, 'ai_data')
+    os.makedirs(data_dir, exist_ok=True)
+    
+    # Export timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Initialize exported models tracking
+    exported_models = {}
+    
+    # Try to load existing metadata if available
+    metadata_path = os.path.join(data_dir, 'metadata.json')
+    try:
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+                exported_models = metadata.get('exported_models', {})
+    except:
+        # If we can't load metadata, start fresh
+        exported_models = {}
+    
+    # Determine which models to export
+    if changed_model:
+        # If a specific model changed, only export that one
+        app_models = [apps.get_model('B4G', changed_model)]
+    else:
+        # Otherwise export all models
+        app_models = apps.get_app_config('B4G').get_models()
+    
+    # Export each model to its own JSON file
+    for model in app_models:
+        model_name = model.__name__
+        model_objects = model.objects.all()
+        
+        # Skip empty models
+        if not model_objects.exists():
+            exported_models[model_name] = 0
+            continue
+            
+        # Serialize all objects from this model
+        serialized_data = serializers.serialize('json', model_objects)
+        
+        # Save to file
+        file_path = os.path.join(data_dir, f"{model_name.lower()}.json")
+        with open(file_path, 'w') as f:
+            f.write(serialized_data)
+        
+        # Track models we've exported
+        exported_models[model_name] = model_objects.count()
+    
+    # Update the metadata file
+    metadata = {
+        "timestamp": timestamp,
+        "exported_models": exported_models,
+        "total_models": len(exported_models),
+        "total_records": sum(exported_models.values())
+    }
+    
+    with open(metadata_path, 'w') as f:
+        json.dump(metadata, f, indent=2)
+    
+    # Also update the summary file for the AI
+    with open(os.path.join(data_dir, 'database_summary.txt'), 'w') as f:
+        f.write(f"Books4Geeks Database Export\n")
+        f.write(f"========================\n")
+        f.write(f"Exported on: {timestamp}\n\n")
+        f.write(f"Total models: {len(exported_models)}\n")
+        f.write(f"Total records: {sum(exported_models.values())}\n\n")
+        
+        f.write("Models and record counts:\n")
+        for model_name, count in exported_models.items():
+            f.write(f"- {model_name}: {count} records\n")
+    
+    return {
+        "success": True,
+        "timestamp": timestamp,
+        "exported_models": exported_models,
+        "total_models": len(exported_models),
+        "total_records": sum(exported_models.values())
+    }
+
+# Keep track of export timing for debouncing
+last_export_time = 0
+export_lock = threading.Lock()
+export_scheduled = False
+
+def schedule_export():
+    """
+    Schedule a database export to happen soon, with debouncing
+    """
+    global export_scheduled, last_export_time
+    
+    with export_lock:
+        current_time = time.time()
+        # If an export was performed recently, skip this one
+        if current_time - last_export_time < 30:  # 30 second cooldown
+            return
+            
+        # If already scheduled, do nothing
+        if export_scheduled:
+            return
+            
+        # Schedule the export
+        export_scheduled = True
+        export_thread = threading.Thread(target=lambda: debounced_export())
+        export_thread.daemon = True
+        export_thread.start()
+
+def debounced_export():
+    """
+    Perform the export after a short delay to avoid multiple exports
+    when many models are updated at once
+    """
+    global export_scheduled, last_export_time
+    
+    # Wait a bit to allow other changes to accumulate
+    time.sleep(5)  
+    
+    with export_lock:
+        if export_scheduled:
+            try:
+                export_full_database()
+                last_export_time = time.time()
+            except Exception as e:
+                print(f"Error exporting database: {e}")
+            finally:
+                export_scheduled = False
+
+# Create a generic signal handler for any model change
+@receiver([post_save, post_delete])
+def handle_model_change(sender, **kwargs):
+    """
+    Signal handler that triggers when any model is saved or deleted
+    """
+    # Skip non-B4G models to avoid triggering on built-in Django models
+    app_label = sender._meta.app_label
+    if app_label != 'B4G':
+        return
+        
+    # Schedule an export
+    schedule_export()
+
+# Register signals for all models in the B4G app
+def register_signals():
+    """
+    Register signal handlers for all models in the B4G app
+    """
+    for model in apps.get_app_config('B4G').get_models():
+        # Skip any models you don't want to trigger exports
+        # For example, models that change very frequently might be excluded
+        # if model.__name__ in ['FrequentlyChangingModel']:
+        #     continue
+            
+        # Connect signals for this model
+        post_save.connect(handle_model_change, sender=model)
+        post_delete.connect(handle_model_change, sender=model)
+        
+        print(f"Registered export signals for model: {model.__name__}")
+        
+@csrf_exempt
+def gemini_api(request):
+    """
+    View to handle Gemini API requests using comprehensive database exports
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            user_message = data.get('message', '')
+            
+            # Configure the Gemini API
+            api_key = "AIzaSyCU0QEQYbgD5k44SC5D5J_A1RYVa_CQQ1M"
+            genai.configure(api_key=api_key)
+            
+            # Create context about the Books4Geeks application
+            system_prompt = "You are an AI assistant for the Books4Geeks application, a Django web app for managing books, authors, publishers, and categories. Keep responses helpful, concise, and focused on the application's features."
+            
+            # Load database summary
+            data_dir = os.path.join(settings.BASE_DIR, 'ai_data')
+            
+            try:
+                with open(os.path.join(data_dir, 'database_summary.txt'), 'r') as f:
+                    db_summary = f.read()
+                    system_prompt += f"\n\nDatabase Information:\n{db_summary}"
+            except FileNotFoundError:
+                system_prompt += "\n\nDatabase summary not available."
+            
+            # Determine which model data to include based on query
+            relevant_models = []
+            
+            # Simple keyword matching for model identification
+            model_keywords = {
+                'publishers': ['publisher', 'publishers', 'publication', 'pubname'],
+                'authors': ['author', 'authors', 'writer', 'writers'],
+                'categories': ['category', 'categories', 'genre', 'genres'],
+                'books': ['book', 'books', 'title', 'description'],
+                'customers': ['customer', 'customers', 'client', 'clients'],
+                'bills': ['bill', 'bills', 'invoice', 'invoices', 'sale', 'sales'],
+                'bookauthors': ['bookauthor', 'book author', 'book writer'],
+                'bookcategories': ['bookcategory', 'book category', 'book genre'],
+                'bookshelves': ['bookshelf', 'bookshelves', 'shelf', 'shelves'],
+                'imports': ['import', 'imports', 'inventory'],
+                'billdetails': ['billdetail', 'bill details', 'invoice details']
+            }
+            
+            # Find relevant models based on keywords
+            for model, keywords in model_keywords.items():
+                if any(keyword in user_message.lower() for keyword in keywords):
+                    relevant_models.append(model)
+            
+            # Always include basic models if nothing specific is found
+            if not relevant_models:
+                relevant_models = ['books', 'authors', 'publishers', 'categories']
+            
+            # Add sample data from relevant models
+            for model in relevant_models:
+                try:
+                    model_file = os.path.join(data_dir, f"{model}.json")
+                    if os.path.exists(model_file):
+                        with open(model_file, 'r') as f:
+                            model_data = json.load(f)
+                            
+                            # Only include a sample (first 3 records)
+                            sample_data = model_data[:3] if len(model_data) > 3 else model_data
+                            
+                            system_prompt += f"\n\n{model.capitalize()} data sample:\n"
+                            system_prompt += json.dumps(sample_data, indent=2)
+                            
+                            if len(model_data) > 3:
+                                system_prompt += f"\n...and {len(model_data) - 3} more records."
+                except Exception as e:
+                    pass  # Skip if we can't load this model data
+            
+            # Access the model and configure it
+            model = genai.GenerativeModel(
+                model_name="gemini-2.0-flash",
+                system_instruction=system_prompt,
+                generation_config={
+                    "temperature": 0.7,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 1024,
+                }
+            )
+            
+            # Generate content
+            response = model.generate_content(user_message)
+            
+            # Check if the response has text
+            if hasattr(response, 'text'):
+                return JsonResponse({'response': response.text})
+            else:
+                return JsonResponse({
+                    'response': 'Sorry, I could not generate a response at this time.',
+                    'error': 'Invalid response structure'
+                })
+                
+        except Exception as e:
+            return JsonResponse({
+                'response': 'Sorry, an error occurred while processing your request.',
+                'error': str(e)
+            })
+    
+    return JsonResponse({'error': 'Only POST requests are allowed'})
+
+# Role and Permission Views
+@login_required
+def role_list(request):
+    """
+    View to display all roles (groups) and their permissions
+    """
+    from django.contrib.auth.models import Group, Permission
+    from django.contrib.contenttypes.models import ContentType
+    
+    groups = Group.objects.all()
+    content_types = ContentType.objects.filter(app_label='B4G')
+    permissions = Permission.objects.filter(content_type__app_label='B4G')
+    
+    # Group permissions by model
+    permissions_by_model = {}
+    for ct in content_types:
+        model_perms = permissions.filter(content_type=ct)
+        if model_perms.exists():
+            permissions_by_model[ct.model] = model_perms
+    
+    template = 'role/list.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'role/ajax_list.html'
+        
+    return render(request, template, {
+        'groups': groups,
+        'permissions_by_model': permissions_by_model
+    })
+
+@login_required
+def role_create(request):
+    """
+    View to create a new role (group) with permissions
+    """
+    from django.contrib.auth.models import Group, Permission
+    from django.contrib.contenttypes.models import ContentType
+    
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        permission_ids = request.POST.getlist('permissions[]') or []
+        
+        # Create the group
+        group = Group.objects.create(name=name)
+        
+        # Add permissions to the group
+        for perm_id in permission_ids:
+            permission = get_object_or_404(Permission, pk=perm_id)
+            group.permissions.add(permission)
+        
+        messages.success(request, 'Role created successfully!')
+        return redirect('role_list')
+    
+    # Get all relevant permissions
+    content_types = ContentType.objects.filter(Q(app_label='B4G') | Q(app_label='auth'))
+    permissions = Permission.objects.filter(content_type__in=content_types)
+    
+    # Group permissions by model
+    permissions_by_model = {}
+    for ct in content_types:
+        model_perms = permissions.filter(content_type=ct)
+        if model_perms.exists():
+            permissions_by_model[f"{ct.app_label}.{ct.model}"] = model_perms
+    
+    template = 'role/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'role/ajax_create.html'
+        
+    return render(request, template, {
+        'permissions': permissions,
+        'permissions_by_model': permissions_by_model
+    })
+
+@login_required
+def role_edit(request, pk):
+    """
+    View to edit a role (group) and its permissions
+    """
+    from django.contrib.auth.models import Group, Permission
+    from django.contrib.contenttypes.models import ContentType
+    
+    group = get_object_or_404(Group, pk=pk)
+    
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        permission_ids = request.POST.getlist('permissions[]') or []
+        
+        # Update the group
+        group.name = name
+        group.save()
+        
+        # Clear existing permissions
+        group.permissions.clear()
+        
+        # Add new permissions
+        for perm_id in permission_ids:
+            permission = get_object_or_404(Permission, pk=perm_id)
+            group.permissions.add(permission)
+        
+        messages.success(request, 'Role updated successfully!')
+        return redirect('role_list')
+    
+    # Get all relevant permissions
+    content_types = ContentType.objects.filter(Q(app_label='B4G') | Q(app_label='auth'))
+    permissions = Permission.objects.filter(content_type__in=content_types)
+    
+    # Group permissions by model
+    permissions_by_model = {}
+    for ct in content_types:
+        model_perms = permissions.filter(content_type=ct)
+        if model_perms.exists():
+            permissions_by_model[f"{ct.app_label}.{ct.model}"] = model_perms
+    
+    # Get the group's current permissions
+    group_permissions = [p.id for p in group.permissions.all()]
+    
+    template = 'role/edit.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'role/ajax_edit.html'
+        
+    return render(request, template, {
+        'group': group,
+        'permissions': permissions,
+        'permissions_by_model': permissions_by_model,
+        'group_permissions': group_permissions
+    })
+
+@login_required
+def role_delete(request, pk):
+    """
+    View to delete a role (group)
+    """
+    from django.contrib.auth.models import Group
+    
+    group = get_object_or_404(Group, pk=pk)
+    group.delete()
+    
+    messages.success(request, 'Role deleted successfully!')
+    return redirect('role_list')
+
+@login_required
+def assign_user_roles(request, user_id=None):
+    """
+    View to assign roles to users
+    """
+    from django.contrib.auth.models import Group
+    
+    if user_id:
+        user = get_object_or_404(User, pk=user_id)
+    else:
+        user = None
+    
+    if request.method == 'POST':
+        user_id = request.POST.get('user_id')
+        group_ids = request.POST.getlist('groups[]') or []
+        
+        user = get_object_or_404(User, pk=user_id)
+        
+        # Clear existing groups
+        user.groups.clear()
+        
+        # Add new groups
+        for group_id in group_ids:
+            group = get_object_or_404(Group, pk=group_id)
+            user.groups.add(group)
+        
+        messages.success(request, 'User roles updated successfully!')
+        return redirect('assign_user_roles')
+    
+    users = User.objects.all()
+    groups = Group.objects.all()
+    
+    # If a specific user is selected, get their current groups
+    user_groups = []
+    if user:
+        user_groups = [g.id for g in user.groups.all()]
+    
+    template = 'role/assign_user.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'role/ajax_assign_user.html'
+        
+    return render(request, template, {
+        'users': users,
+        'groups': groups,
+        'selected_user': user,
+        'user_groups': user_groups
+    })
+
+def lookup_barcode(request, barcode_number):
+    """
+    Simplified endpoint to look up a book by barcode number.
+    Does not require login for faster lookup during scanning.
+    """
+    try:
+        book = Books.objects.get(barcode_number=barcode_number)
+        
+        # Get author and category info
+        authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+        categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+        
+        # Format response
+        response = {
+            'success': True,
+            'book': {
+                'id': book.id,
+                'description': book.description,
+                'price': book.price,
+                'publisher': book.id_pub.pubname if book.id_pub else None,
+                'authors': authors,
+                'categories': categories,
+            }
+        }
+        
+        return JsonResponse(response)
+    except Books.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': f'Book not found with barcode: {barcode_number}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

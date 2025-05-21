@@ -1,0 +1,241 @@
+{% extends 'layouts/base.html' %}
+
+{% load static %}
+
+{% block title %} Create Reservation {% endblock title %}
+
+<!-- Specific CSS goes HERE -->
+{% block stylesheets %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<!-- DatePicker -->
+<link rel="stylesheet" href="{% static 'plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css' %}">
+<style>
+  .book-row {
+    margin-bottom: 15px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+  }
+  .remove-book {
+    cursor: pointer;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Create Book Reservation</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reservation_list' %}">Reservations</a></li>
+            <li class="breadcrumb-item active">Create Reservation</li>
+          </ol>
+        </div>
+      </div>
+    </div><!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Create New Book Reservation</h3>
+              <div class="card-tools">
+                <a href="{% url 'reservation_list' %}" class="btn btn-default btn-sm ajax-link">
+                  <i class="fas fa-arrow-left"></i> Back to Reservations
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              <form id="reservationForm" method="POST">
+                {% csrf_token %}
+
+                <!-- Customer Selection -->
+                <div class="form-group">
+                  <label for="id_cus">Customer</label>
+                  <select class="form-control select2" id="id_cus" name="id_cus" required>
+                    <option value="">Select a customer</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}">{{ customer.cusname }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <!-- Pickup Date -->
+                <div class="form-group">
+                  <label for="pickupdate">Pickup Date</label>
+                  <input type="datetime-local" class="form-control" id="pickupdate" name="pickupdate" required>
+                </div>
+
+                <!-- Status -->
+                <div class="form-group">
+                  <label for="status">Status</label>
+                  <select class="form-control" id="status" name="status" required>
+                    <option value="Pending">Pending</option>
+                    <option value="Reserved">Reserved</option>
+                    <option value="Picked Up">Picked Up</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <!-- Books Container -->
+                <div class="card card-primary">
+                  <div class="card-header">
+                    <h3 class="card-title"><i class="fas fa-book mr-2"></i>Books to Reserve</h3>
+                    <div class="card-tools">
+                      <button type="button" id="addBookBtn" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus"></i> Add Book
+                      </button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <p class="text-muted mb-3">
+                      <i class="fas fa-info-circle mr-1"></i> Select one or more books to reserve. You can add additional books using the "Add Book" button.
+                    </p>
+                    <div id="booksContainer">
+                      <!-- Book rows will be added here -->
+                      <div class="book-row">
+                        <div class="card bg-light mb-3">
+                          <div class="card-body p-3">
+                            <div class="row">
+                              <div class="col-md-11">
+                                <div class="form-group mb-0">
+                                  <label><i class="fas fa-book mr-1"></i>Book</label>
+                                  <select class="form-control select2 book-select" name="book_ids[]" required>
+                                    <option value="">Select a book</option>
+                                    {% for book in books %}
+                                    <option value="{{ book.id }}">{{ book.description }}</option>
+                                    {% endfor %}
+                                  </select>
+                                </div>
+                              </div>
+                              <div class="col-md-1 d-flex align-items-end">
+                                <button type="button" class="btn btn-danger btn-block remove-book mb-0" title="Remove this book">
+                                  <i class="fas fa-trash"></i>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group mt-4">
+                  <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save mr-1"></i> Create Reservation
+                  </button>
+                  <a href="{% url 'reservation_list' %}" class="btn btn-secondary btn-lg ml-2">
+                    <i class="fas fa-times mr-1"></i> Cancel
+                  </a>
+                </div>
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+
+<!-- Book Template - We don't need this anymore since we're using template literals -->
+<script>
+  $(function () {
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      allowClear: true,
+      placeholder: "Select options..."
+    });
+
+    // Add book button - simple jQuery approach
+    $('#addBookBtn').click(function(e) {
+      e.preventDefault();
+      
+      var bookRow = `
+        <div class="book-row">
+          <div class="card bg-light mb-3">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-md-11">
+                  <div class="form-group mb-0">
+                    <label><i class="fas fa-book mr-1"></i>Book</label>
+                    <select class="form-control select2 book-select" name="book_ids[]" required>
+                      <option value="">Select a book</option>
+                      {% for book in books %}
+                      <option value="{{ book.id }}">{{ book.description }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                  <button type="button" class="btn btn-danger btn-block remove-book mb-0" title="Remove this book">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Add the new row to the container
+      $('#booksContainer').append(bookRow);
+      
+      // Initialize Select2 for the new dropdown
+      $('#booksContainer .book-select:last').select2({
+        theme: 'bootstrap4',
+        allowClear: true,
+        placeholder: "Select options..."
+      });
+
+      // Scroll to the new element
+      $('html, body').animate({
+        scrollTop: $('#booksContainer .book-row:last').offset().top - 100
+      }, 300);
+    });
+
+    // Remove book button
+    $(document).on('click', '.remove-book', function(e) {
+      e.preventDefault();
+      
+      // Don't remove if it's the only book row
+      if ($('.book-row').length > 1) {
+        $(this).closest('.book-row').remove();
+      } else {
+        alert('You must have at least one book to reserve.');
+      }
+    });
+  });
+</script>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+{% block javascripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+{% endblock javascripts %} 

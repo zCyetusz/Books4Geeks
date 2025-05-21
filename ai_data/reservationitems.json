@@ -1,0 +1,1 @@
+[{"model": "B4G.reservationitems", "pk": 1, "fields": {"id_reservation": 2, "id_book": 1, "lastmodified": "2025-05-21T15:25:06.698Z"}}, {"model": "B4G.reservationitems", "pk": 2, "fields": {"id_reservation": 1, "id_book": 2, "lastmodified": "2025-05-21T15:29:45.629Z"}}]

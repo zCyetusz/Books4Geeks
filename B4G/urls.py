@@ -11,6 +11,9 @@ urlpatterns = [
     # API endpoints
     path('api/gemini/', views.gemini_api, name='gemini_api'),
     path('api/get_book_by_barcode/<str:barcode_number>/', views.get_book_by_barcode, name='get_book_by_barcode'),
+    path('api/process_barcode/', views.process_barcode, name='process_barcode'),
+    path('api/create_bill_from_scanned/', views.create_bill_from_scanned, name='create_bill_from_scanned'),
+    path('api/lookup_barcode/<str:barcode_number>/', views.lookup_barcode, name='lookup_barcode'),
 
     # Authentication
     path('accounts/register/', views.register, name='register'),
@@ -78,10 +81,29 @@ urlpatterns = [
     path('bills/edit/<int:pk>/', views.bill_edit, name='bill_edit'),
     path('bills/delete/<int:pk>/', views.bill_delete, name='bill_delete'),
     path('bills/scan-barcode/', views.bill_scan_barcode, name='bill_scan_barcode'),
+    path('bills/start-camera/', views.start_camera, name='start_camera'),
+    path('bills/stop-camera/', views.stop_camera, name='stop_camera'),
+    path('bills/video-feed/', views.video_feed, name='video_feed'),
+    path('bills/scan-barcode-desktop/', views.scan_barcode_desktop, name='bill_scan_barcode_desktop'),
     
     # Customers
     path('customers/', views.customer_list, name='customer_list'),
     path('customers/create/', views.customer_create, name='customer_create'),
     path('customers/edit/<int:pk>/', views.customer_edit, name='customer_edit'),
     path('customers/delete/<int:pk>/', views.customer_delete, name='customer_delete'),
+    
+    # Reservations
+    path('reservations/', views.reservation_list, name='reservation_list'),
+    path('reservations/create/', views.reservation_create, name='reservation_create'),
+    path('reservations/edit/<int:pk>/', views.reservation_edit, name='reservation_edit'),
+    path('reservations/delete/<int:pk>/', views.reservation_delete, name='reservation_delete'),
+    path('reservations/customer/<int:customer_id>/', views.customer_reservations, name='customer_reservations'),
+    
+    # Roles and Permissions
+    path('roles/', views.role_list, name='role_list'),
+    path('roles/create/', views.role_create, name='role_create'),
+    path('roles/edit/<int:pk>/', views.role_edit, name='role_edit'),
+    path('roles/delete/<int:pk>/', views.role_delete, name='role_delete'),
+    path('roles/assign/', views.assign_user_roles, name='assign_user_roles'),
+    path('roles/assign/<int:user_id>/', views.assign_user_roles, name='assign_user_roles_to_user'),
 ] 

@@ -1,0 +1,185 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %} Role Management {% endblock title %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Role Management</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item active">Roles</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Role List</h3>
+              <div class="card-tools">
+                <a href="{% url 'role_create' %}" class="btn btn-primary btn-sm">
+                  <i class="fas fa-plus"></i> Add Role
+                </a>
+                <a href="{% url 'assign_user_roles' %}" class="btn btn-info btn-sm ml-2">
+                  <i class="fas fa-user-tag"></i> Assign Roles to Users
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              {% if messages %}
+                {% for message in messages %}
+                  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+              
+              <table id="roleTable" class="table table-bordered table-striped">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Role Name</th>
+                    <th>Permissions</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for group in groups %}
+                  <tr>
+                    <td>{{ group.id }}</td>
+                    <td>{{ group.name }}</td>
+                    <td>
+                      <button type="button" class="btn btn-sm btn-outline-info" data-toggle="modal" data-target="#permModal{{ group.id }}">
+                        View Permissions <span class="badge badge-pill badge-primary">{{ group.permissions.count }}</span>
+                      </button>
+                    </td>
+                    <td>
+                      <a href="{% url 'role_edit' group.id %}" class="btn btn-info btn-sm">
+                        <i class="fas fa-pencil-alt"></i> Edit
+                      </a>
+                      <a href="{% url 'role_delete' group.id %}" class="btn btn-danger btn-sm"
+                         onclick="return confirm('Are you sure you want to delete this role?')">
+                        <i class="fas fa-trash"></i> Delete
+                      </a>
+                    </td>
+                  </tr>
+                  
+                  <!-- Modal for permissions -->
+                  <div class="modal fade" id="permModal{{ group.id }}" tabindex="-1" role="dialog" aria-labelledby="permModalLabel{{ group.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-lg" role="document">
+                      <div class="modal-content">
+                        <div class="modal-header bg-info">
+                          <h5 class="modal-title" id="permModalLabel{{ group.id }}">Permissions for "{{ group.name }}" Role</h5>
+                          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                          </button>
+                        </div>
+                        <div class="modal-body">
+                          {% if group.permissions.exists %}
+                            <div class="row">
+                              {% for model, perms in permissions_by_model.items %}
+                                <div class="col-md-6 mb-3">
+                                  <div class="card">
+                                    <div class="card-header bg-light">
+                                      <h5 class="card-title mb-0 text-capitalize">{{ model }}</h5>
+                                    </div>
+                                    <div class="card-body p-0">
+                                      <ul class="list-group list-group-flush">
+                                        {% for perm in perms %}
+                                          <li class="list-group-item {% if perm in group.permissions.all %}list-group-item-success{% endif %}">
+                                            {% if perm in group.permissions.all %}
+                                              <i class="fas fa-check-circle text-success mr-2"></i>
+                                            {% else %}
+                                              <i class="fas fa-times-circle text-muted mr-2"></i>
+                                            {% endif %}
+                                            {{ perm.name }}
+                                          </li>
+                                        {% endfor %}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                </div>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            <div class="alert alert-warning">
+                              This role has no permissions assigned yet.
+                            </div>
+                          {% endif %}
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                          <a href="{% url 'role_edit' group.id %}" class="btn btn-primary">Edit Permissions</a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center">No roles defined yet. <a href="{% url 'role_create' %}">Create your first role</a>.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock content %}
+
+{% block extra_scripts %}
+<!-- DataTables  & Plugins -->
+<script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/dataTables.responsive.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/responsive.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/jszip/jszip.min.js' %}"></script>
+<script src="{% static 'plugins/pdfmake/pdfmake.min.js' %}"></script>
+<script src="{% static 'plugins/pdfmake/vfs_fonts.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.html5.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.print.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.colVis.min.js' %}"></script>
+
+<script>
+  $(function () {
+    $("#roleTable").DataTable({
+      responsive: true,
+      lengthChange: false,
+      autoWidth: false,
+      buttons: ["copy", "csv", "excel", "pdf", "print", "colvis"]
+    }).buttons().container().appendTo('#roleTable_wrapper .col-md-6:eq(0)');
+  });
+</script>
+{% endblock extra_scripts %} 

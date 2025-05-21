@@ -1,0 +1,1 @@
+[{"model": "B4G.publishers", "pk": 1, "fields": {"pubname": "Long", "description": "1", "lastmodified": "2025-05-21T14:28:34.632Z"}}, {"model": "B4G.publishers", "pk": 2, "fields": {"pubname": "Long2", "description": "2", "lastmodified": "2025-05-21T14:28:59.583Z"}}]

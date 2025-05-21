@@ -16,6 +16,7 @@
       <thead>
         <tr>
           <th>ID</th>
+          <th>BookName</th>
           <th>Description</th>
           <th>Price</th>
           <th>Publisher</th>
@@ -30,6 +31,7 @@
         {% for book in books %}
         <tr>
           <td>{{ book.id }}</td>
+          <td>{{ book.bookname }}</td>
           <td>{{ book.description }}</td>
           <td>{{ book.price }}</td>
           <td>{{ book.id_pub.pubname }}</td>

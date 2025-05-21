@@ -11,6 +11,16 @@
   <div class="card-body">
     <form id="book-form">
       {% csrf_token %}
+        <div class="form-group">
+        <label for="bookname">Book Name</label>
+        <input
+           type="text"
+           class="form-control"
+           id="bookname"
+           name="bookname"
+           required
+        />
+      </div>
       <div class="form-group">
         <label for="description">Description</label>
         <input

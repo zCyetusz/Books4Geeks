@@ -16,6 +16,9 @@ class UserProfile(models.Model):
 
     #__PROFILE_FIELDS__
     password = models.TextField(max_length=255, null=True, blank=True)
+    primary_role = models.ForeignKey('auth.Group', on_delete=models.SET_NULL, null=True, blank=True, 
+                                  related_name='primary_users', verbose_name=_('Primary Role'))
+    
 
     #__PROFILE_FIELDS__END
 
@@ -229,6 +232,7 @@ class Bookshelves(models.Model):
 class Employees(models.Model):
 
     #__Employees_FIELDS__
+    id_user = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
     empname = models.TextField(max_length=255, null=True, blank=True)
     role = models.TextField(max_length=255, null=True, blank=True)
     phone = models.TextField(max_length=255, null=True, blank=True)
@@ -247,13 +251,35 @@ class Employees(models.Model):
 class Reservations(models.Model):
 
     #__Reservations_FIELDS__
-    reservedate = models.DateTimeField(blank=True, null=True, default=timezone.now)
-    pickupdate = models.DateTimeField(blank=True, null=True, default=timezone.now)
-    status = models.TextField(max_length=255, null=True, blank=True)
+    id_cus = models.ForeignKey(Customers, on_delete=models.CASCADE, verbose_name=_("Customer"))
+    reservedate = models.DateTimeField(blank=True, null=True, default=timezone.now, verbose_name=_("Reservation Date"))
+    pickupdate = models.DateTimeField(blank=True, null=True, default=timezone.now, verbose_name=_("Pickup Date"))
+    status = models.TextField(max_length=255, null=True, blank=True, verbose_name=_("Status"))
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
 
     #__Reservations_FIELDS__END
 
+    def __str__(self):
+        return f"Reservation #{self.id} - {self.id_cus.cusname}" if self.id_cus else f"Reservation #{self.id}"
+    
     class Meta:
-        verbose_name        = _("Reservations")
+        verbose_name = _("Reservation")
         verbose_name_plural = _("Reservations")
+
+
+class ReservationItems(models.Model):
+
+    #__ReservationItems_FIELDS__
+    id_reservation = models.ForeignKey(Reservations, on_delete=models.CASCADE, related_name="items", verbose_name=_("Reservation"))
+    id_book = models.ForeignKey(Books, on_delete=models.CASCADE, verbose_name=_("Book"))
+    lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
+
+    #__ReservationItems_FIELDS__END
+
+    def __str__(self):
+        book_name = self.id_book.description if self.id_book else "Unknown Book"
+        return f"{book_name} (Reservation #{self.id_reservation_id})"
+    
+    class Meta:
+        verbose_name = _("Reservation Item")
+        verbose_name_plural = _("Reservation Items")

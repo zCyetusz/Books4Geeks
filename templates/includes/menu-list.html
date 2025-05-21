@@ -971,6 +971,31 @@
     </ul>
   </li>
   
+  <!-- Role Management -->
+  <li class="nav-item">
+    <a href="#" class="nav-link">
+      <i class="nav-icon fas fa-user-tag"></i>
+      <p>
+        Role Management
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'role_list' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Roles & Permissions</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'assign_user_roles' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Assign User Roles</p>
+        </a>
+      </li>
+    </ul>
+  </li>
+  
   <!-- Customers -->
   <li class="nav-item">
     <a href="#" class="nav-link">
@@ -998,12 +1023,27 @@
   
   <!-- Reservations -->
   <li class="nav-item">
-    {% comment %}
-    <a href="{% url 'reservation_list' %}" class="nav-link ajax-link">
-      {% endcomment %}
-      <i class="far fa-circle nav-icon"></i>
-      <p>Reservations</p>
+    <a href="#" class="nav-link">
+      <i class="nav-icon fas fa-calendar-alt"></i>
+      <p>
+        Reservations
+        <i class="right fas fa-angle-left"></i>
+      </p>
     </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'reservation_list' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Reservation List</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'reservation_create' %}" class="nav-link ajax-link">
+          <i class="far fa-circle nav-icon"></i>
+          <p>Create Reservation</p>
+        </a>
+      </li>
+    </ul>
   </li>
   <li class="nav-item">
     <a href="{% url 'logout' %}" class="nav-link direct-link">

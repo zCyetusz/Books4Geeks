@@ -1,0 +1,217 @@
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Edit Reservation #{{ reservation.id }}</h3>
+    <div class="card-tools">
+      <a href="{% url 'reservation_list' %}" class="btn btn-default btn-sm ajax-link">
+        <i class="fas fa-arrow-left"></i> Back to Reservations
+      </a>
+    </div>
+  </div>
+  <!-- /.card-header -->
+  <div class="card-body">
+    <form id="reservationForm">
+      {% csrf_token %}
+
+      <!-- Customer Selection -->
+      <div class="form-group">
+        <label for="id_cus">Customer</label>
+        <select class="form-control select2" id="id_cus" name="id_cus" required>
+          <option value="">Select a customer</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if customer.id == reservation.id_cus.id %}selected{% endif %}>
+            {{ customer.cusname }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Pickup Date -->
+      <div class="form-group">
+        <label for="pickupdate">Pickup Date</label>
+        <input type="datetime-local" class="form-control" id="pickupdate" name="pickupdate" 
+               value="{{ reservation.pickupdate|date:'Y-m-d\TH:i' }}" required>
+      </div>
+
+      <!-- Status -->
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select class="form-control" id="status" name="status" required>
+          <option value="Pending" {% if reservation.status == 'Pending' %}selected{% endif %}>Pending</option>
+          <option value="Reserved" {% if reservation.status == 'Reserved' %}selected{% endif %}>Reserved</option>
+          <option value="Picked Up" {% if reservation.status == 'Picked Up' %}selected{% endif %}>Picked Up</option>
+          <option value="Cancelled" {% if reservation.status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+      </div>
+
+      <!-- Reserve Date (Display Only) -->
+      <div class="form-group">
+        <label>Reservation Date</label>
+        <input type="text" class="form-control" value="{{ reservation.reservedate|date:'Y-m-d H:i' }}" readonly>
+        <small class="text-muted">This field cannot be changed.</small>
+      </div>
+
+      <!-- Books Container -->
+      <div class="card card-primary">
+        <div class="card-header">
+          <h3 class="card-title"><i class="fas fa-book mr-2"></i>Books in this Reservation</h3>
+          <div class="card-tools">
+            <button type="button" id="addBookBtn" class="btn btn-success btn-sm">
+              <i class="fas fa-plus"></i> Add Book
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <p class="text-muted mb-3">
+            <i class="fas fa-info-circle mr-1"></i> Select one or more books to reserve. You can add additional books using the "Add Book" button.
+          </p>
+          <div id="booksContainer">
+            <!-- Book rows will be added here dynamically -->
+            {% for book_id in reserved_books %}
+            <div class="book-row">
+              <div class="card bg-light mb-3">
+                <div class="card-body p-3">
+                  <div class="row">
+                    <div class="col-md-11">
+                      <div class="form-group mb-0">
+                        <label><i class="fas fa-book mr-1"></i>Book</label>
+                        <select class="form-control select2 book-select" name="book_ids[]" required>
+                          <option value="">Select a book</option>
+                          {% for book in books %}
+                          <option value="{{ book.id }}" {% if book.id == book_id %}selected{% endif %}>{{ book.description }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                      <button type="button" class="btn btn-danger btn-block remove-book mb-0" title="Remove this book">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% empty %}
+            <!-- If there are no books, add at least one empty row -->
+            <div class="book-row">
+              <div class="card bg-light mb-3">
+                <div class="card-body p-3">
+                  <div class="row">
+                    <div class="col-md-11">
+                      <div class="form-group mb-0">
+                        <label><i class="fas fa-book mr-1"></i>Book</label>
+                        <select class="form-control select2 book-select" name="book_ids[]" required>
+                          <option value="">Select a book</option>
+                          {% for book in books %}
+                          <option value="{{ book.id }}">{{ book.description }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                      <button type="button" class="btn btn-danger btn-block remove-book mb-0" title="Remove this book">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group mt-3">
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> Update Reservation
+        </button>
+        <a href="{% url 'reservation_list' %}" class="btn btn-secondary ajax-link">Cancel</a>
+      </div>
+    </form>
+  </div>
+  <!-- /.card-body -->
+</div>
+<!-- /.card -->
+
+<script>
+  $(function () {
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      width: '100%'
+    });
+
+    // Add book button
+    $('#addBookBtn').click(function(e) {
+      e.preventDefault();
+      
+      var bookRow = `
+        <div class="book-row">
+          <div class="card bg-light mb-3">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-md-11">
+                  <div class="form-group mb-0">
+                    <label><i class="fas fa-book mr-1"></i>Book</label>
+                    <select class="form-control select2 book-select" name="book_ids[]" required>
+                      <option value="">Select a book</option>
+                      {% for book in books %}
+                      <option value="{{ book.id }}">{{ book.description }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                  <button type="button" class="btn btn-danger btn-block remove-book mb-0" title="Remove this book">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Add the new row to the container
+      $('#booksContainer').append(bookRow);
+      
+      // Initialize Select2 for the new dropdown
+      $('#booksContainer .book-select:last').select2({
+        theme: 'bootstrap4',
+        width: '100%'
+      });
+    });
+
+    // Remove book button
+    $(document).on('click', '.remove-book', function(e) {
+      e.preventDefault();
+      
+      // Don't remove if it's the only book row
+      if ($('.book-row').length > 1) {
+        $(this).closest('.book-row').remove();
+      } else {
+        alert('You must have at least one book to reserve.');
+      }
+    });
+
+    // Form submission via AJAX
+    $('#reservationForm').on('submit', function(e) {
+      e.preventDefault();
+      $.ajax({
+        url: "{% url 'reservation_edit' reservation.id %}",
+        type: 'POST',
+        data: $(this).serialize(),
+        success: function(response) {
+          if (response.status === 'success') {
+            // Load the reservation list
+            loadContent("{% url 'reservation_list' %}");
+          }
+        },
+        error: function(xhr) {
+          alert('An error occurred while updating the reservation.');
+        }
+      });
+    });
+  });
+</script> 

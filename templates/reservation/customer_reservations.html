@@ -1,0 +1,185 @@
+{% extends 'layouts/base.html' %}
+
+{% load static %}
+
+{% block title %} Customer Reservations {% endblock title %}
+
+<!-- Specific CSS goes HERE -->
+{% block stylesheets %}
+<!-- DataTables -->
+<link rel="stylesheet" href="{% static 'plugins/datatables-bs4/css/dataTables.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-responsive/css/responsive.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-buttons/css/buttons.bootstrap4.min.css' %}">
+{% endblock stylesheets %}
+
+{% block content %}
+
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Reservations for {{ customer.cusname }}</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'reservation_list' %}">Reservations</a></li>
+            <li class="breadcrumb-item active">Customer Reservations</li>
+          </ol>
+        </div>
+      </div>
+    </div><!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <!-- Customer Information Card -->
+      <div class="card card-primary">
+        <div class="card-header">
+          <h3 class="card-title">Customer Information</h3>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label>Name</label>
+                <p class="form-control-static">{{ customer.cusname }}</p>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Gender</label>
+                <p class="form-control-static">{{ customer.gender }}</p>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label>Phone</label>
+                <p class="form-control-static">{{ customer.phone }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Reservations</h3>
+              <div class="card-tools">
+                <a href="{% url 'reservation_create' %}" class="btn btn-primary btn-sm ajax-link">
+                  <i class="fas fa-plus"></i> New Reservation
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              {% if messages %}
+                {% for message in messages %}
+                  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+              
+              {% if reservations %}
+              <table id="reservationsTable" class="table table-bordered table-striped">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Book</th>
+                    <th>Reserve Date</th>
+                    <th>Pickup Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for reservation in reservations %}
+                  <tr>
+                    <td>{{ reservation.id }}</td>
+                    <td>{{ reservation.id_book.description }}</td>
+                    <td>{{ reservation.reservedate|date:"Y-m-d H:i" }}</td>
+                    <td>{{ reservation.pickupdate|date:"Y-m-d H:i" }}</td>
+                    <td>
+                      {% if reservation.status == 'Pending' %}
+                        <span class="badge badge-warning">Pending</span>
+                      {% elif reservation.status == 'Reserved' %}
+                        <span class="badge badge-info">Reserved</span>
+                      {% elif reservation.status == 'Picked Up' %}
+                        <span class="badge badge-success">Picked Up</span>
+                      {% elif reservation.status == 'Cancelled' %}
+                        <span class="badge badge-danger">Cancelled</span>
+                      {% else %}
+                        <span class="badge badge-secondary">{{ reservation.status }}</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="{% url 'reservation_edit' reservation.id %}" class="btn btn-info btn-sm ajax-link">
+                        <i class="fas fa-edit"></i> Edit
+                      </a>
+                      <a href="{% url 'reservation_delete' reservation.id %}" class="btn btn-danger btn-sm" 
+                         onclick="return confirm('Are you sure you want to delete this reservation?');">
+                        <i class="fas fa-trash"></i> Delete
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              {% else %}
+              <div class="alert alert-info">
+                This customer has no reservations yet. <a href="{% url 'reservation_create' %}" class="ajax-link">Create a new reservation</a>
+              </div>
+              {% endif %}
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+{% block javascripts %}
+<!-- DataTables  & Plugins -->
+<script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/dataTables.responsive.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/responsive.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/jszip/jszip.min.js' %}"></script>
+<script src="{% static 'plugins/pdfmake/pdfmake.min.js' %}"></script>
+<script src="{% static 'plugins/pdfmake/vfs_fonts.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.html5.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.print.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.colVis.min.js' %}"></script>
+
+<script>
+  $(function () {
+    $("#reservationsTable").DataTable({
+      "responsive": true, 
+      "lengthChange": false, 
+      "autoWidth": false,
+      "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
+    }).buttons().container().appendTo('#reservationsTable_wrapper .col-md-6:eq(0)');
+  });
+</script>
+{% endblock javascripts %} 
