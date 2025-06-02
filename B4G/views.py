@@ -2315,8 +2315,9 @@ def role_list(request):
     from django.contrib.contenttypes.models import ContentType
     
     groups = Group.objects.all()
-    content_types = ContentType.objects.filter(app_label='B4G')
-    permissions = Permission.objects.filter(content_type__app_label='B4G')
+    # Include both B4G and auth app permissions for comprehensive role management
+    content_types = ContentType.objects.filter(Q(app_label='B4G') | Q(app_label='auth'))
+    permissions = Permission.objects.filter(content_type__in=content_types)
     
     # Group permissions by model
     permissions_by_model = {}
@@ -2348,16 +2349,33 @@ def role_create(request):
         name = request.POST.get('name')
         permission_ids = request.POST.getlist('permissions[]') or []
         
-        # Create the group
-        group = Group.objects.create(name=name)
+        # Validate role name
+        if not name or not name.strip():
+            messages.error(request, 'Role name is required!')
+            return redirect('role_create')
         
-        # Add permissions to the group
-        for perm_id in permission_ids:
-            permission = get_object_or_404(Permission, pk=perm_id)
-            group.permissions.add(permission)
+        # Check if role name already exists
+        if Group.objects.filter(name=name.strip()).exists():
+            messages.error(request, 'A role with this name already exists!')
+            return redirect('role_create')
         
-        messages.success(request, 'Role created successfully!')
-        return redirect('role_list')
+        try:
+            # Create the group
+            group = Group.objects.create(name=name.strip())
+            
+            # Add permissions to the group
+            for perm_id in permission_ids:
+                try:
+                    permission = Permission.objects.get(pk=perm_id)
+                    group.permissions.add(permission)
+                except Permission.DoesNotExist:
+                    continue
+            
+            messages.success(request, f'Role "{group.name}" created successfully with {group.permissions.count()} permissions!')
+            return redirect('role_list')
+        except Exception as e:
+            messages.error(request, f'Error creating role: {str(e)}')
+            return redirect('role_create')
     
     # Get all relevant permissions
     content_types = ContentType.objects.filter(Q(app_label='B4G') | Q(app_label='auth'))
@@ -2368,7 +2386,18 @@ def role_create(request):
     for ct in content_types:
         model_perms = permissions.filter(content_type=ct)
         if model_perms.exists():
-            permissions_by_model[f"{ct.app_label}.{ct.model}"] = model_perms
+            permissions_by_model[ct.model] = model_perms
+    
+    template = 'role/create.html'
+    
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        template = 'role/ajax_create.html'
+        
+    return render(request, template, {
+        'permissions': permissions,
+        'permissions_by_model': permissions_by_model
+    })
     
     template = 'role/create.html'
     
@@ -2395,20 +2424,37 @@ def role_edit(request, pk):
         name = request.POST.get('name')
         permission_ids = request.POST.getlist('permissions[]') or []
         
-        # Update the group
-        group.name = name
-        group.save()
+        # Validate role name
+        if not name or not name.strip():
+            messages.error(request, 'Role name is required!')
+            return redirect('role_edit', pk=pk)
         
-        # Clear existing permissions
-        group.permissions.clear()
+        # Check if role name already exists (excluding current role)
+        if Group.objects.filter(name=name.strip()).exclude(pk=pk).exists():
+            messages.error(request, 'A role with this name already exists!')
+            return redirect('role_edit', pk=pk)
         
-        # Add new permissions
-        for perm_id in permission_ids:
-            permission = get_object_or_404(Permission, pk=perm_id)
-            group.permissions.add(permission)
-        
-        messages.success(request, 'Role updated successfully!')
-        return redirect('role_list')
+        try:
+            # Update the group
+            group.name = name.strip()
+            group.save()
+            
+            # Clear existing permissions
+            group.permissions.clear()
+            
+            # Add new permissions
+            for perm_id in permission_ids:
+                try:
+                    permission = Permission.objects.get(pk=perm_id)
+                    group.permissions.add(permission)
+                except Permission.DoesNotExist:
+                    continue
+            
+            messages.success(request, f'Role "{group.name}" updated successfully with {group.permissions.count()} permissions!')
+            return redirect('role_list')
+        except Exception as e:
+            messages.error(request, f'Error updating role: {str(e)}')
+            return redirect('role_edit', pk=pk)
     
     # Get all relevant permissions
     content_types = ContentType.objects.filter(Q(app_label='B4G') | Q(app_label='auth'))
@@ -2419,7 +2465,7 @@ def role_edit(request, pk):
     for ct in content_types:
         model_perms = permissions.filter(content_type=ct)
         if model_perms.exists():
-            permissions_by_model[f"{ct.app_label}.{ct.model}"] = model_perms
+            permissions_by_model[ct.model] = model_perms
     
     # Get the group's current permissions
     group_permissions = [p.id for p in group.permissions.all()]
@@ -2445,9 +2491,20 @@ def role_delete(request, pk):
     from django.contrib.auth.models import Group
     
     group = get_object_or_404(Group, pk=pk)
-    group.delete()
     
-    messages.success(request, 'Role deleted successfully!')
+    # Check if any users are assigned to this role
+    users_count = group.user_set.count()
+    if users_count > 0:
+        messages.warning(request, f'Cannot delete role "{group.name}" because {users_count} user(s) are assigned to it. Please remove users from this role first.')
+        return redirect('role_list')
+    
+    group_name = group.name
+    try:
+        group.delete()
+        messages.success(request, f'Role "{group_name}" deleted successfully!')
+    except Exception as e:
+        messages.error(request, f'Error deleting role: {str(e)}')
+    
     return redirect('role_list')
 
 @login_required
@@ -2456,31 +2513,65 @@ def assign_user_roles(request, user_id=None):
     View to assign roles to users
     """
     from django.contrib.auth.models import Group
+    from django.http import JsonResponse
     
     if user_id:
         user = get_object_or_404(User, pk=user_id)
     else:
         user = None
     
+    # Handle AJAX requests for user data
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('user_id'):
+        ajax_user_id = request.GET.get('user_id')
+        ajax_user = get_object_or_404(User, pk=ajax_user_id)
+        user_groups = [g.id for g in ajax_user.groups.all()]
+        
+        return JsonResponse({
+            'user': {
+                'id': ajax_user.id,
+                'username': ajax_user.username,
+                'email': ajax_user.email,
+                'full_name': ajax_user.get_full_name(),
+                'is_active': ajax_user.is_active,
+            },
+            'user_groups': user_groups
+        })
+    
     if request.method == 'POST':
         user_id = request.POST.get('user_id')
         group_ids = request.POST.getlist('groups[]') or []
         
+        if not user_id:
+            messages.error(request, 'Please select a user!')
+            return redirect('assign_user_roles')
+        
         user = get_object_or_404(User, pk=user_id)
         
-        # Clear existing groups
-        user.groups.clear()
-        
-        # Add new groups
-        for group_id in group_ids:
-            group = get_object_or_404(Group, pk=group_id)
-            user.groups.add(group)
-        
-        messages.success(request, 'User roles updated successfully!')
-        return redirect('assign_user_roles')
+        try:
+            # Clear existing groups
+            user.groups.clear()
+            
+            # Add new groups
+            for group_id in group_ids:
+                try:
+                    group = Group.objects.get(pk=group_id)
+                    user.groups.add(group)
+                except Group.DoesNotExist:
+                    continue
+            
+            role_count = user.groups.count()
+            if role_count > 0:
+                messages.success(request, f'User "{user.get_full_name() or user.username}" roles updated successfully! Assigned {role_count} role(s).')
+            else:
+                messages.success(request, f'All roles removed from user "{user.get_full_name() or user.username}".')
+            
+            return redirect('assign_user_roles', user_id=user.id)
+        except Exception as e:
+            messages.error(request, f'Error updating user roles: {str(e)}')
+            return redirect('assign_user_roles')
     
-    users = User.objects.all()
-    groups = Group.objects.all()
+    users = User.objects.all().order_by('username')
+    groups = Group.objects.all().order_by('name')
     
     # If a specific user is selected, get their current groups
     user_groups = []

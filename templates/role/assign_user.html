@@ -1,0 +1,249 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %} Assign User Roles {% endblock title %}
+
+{% block stylesheets %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<style>
+  .user-card {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 15px;
+  }
+  .role-checkbox {
+    margin-bottom: 10px;
+  }
+</style>
+{% endblock stylesheets %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Assign User Roles</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="/">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'role_list' %}">Roles</a></li>
+            <li class="breadcrumb-item active">Assign Users</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Assign Roles to Users</h3>
+              <div class="card-tools">
+                <a href="{% url 'role_list' %}" class="btn btn-default">
+                  <i class="fas fa-arrow-left"></i> Back to Roles
+                </a>
+              </div>
+            </div>
+            <!-- /.card-header -->
+            <div class="card-body">
+              {% if messages %}
+                {% for message in messages %}
+                  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                      <span aria-hidden="true">&times;</span>
+                    </button>
+                  </div>
+                {% endfor %}
+              {% endif %}
+
+              <form method="post" id="userRoleForm">
+                {% csrf_token %}
+                
+                <!-- User Selection -->
+                <div class="form-group">
+                  <label for="user_id">Select User</label>
+                  <select class="form-control select2" id="user_id" name="user_id" required>
+                    <option value="">Choose a user...</option>
+                    {% for user in users %}
+                      <option value="{{ user.id }}" {% if selected_user and selected_user.id == user.id %}selected{% endif %}>
+                        {{ user.get_full_name|default:user.username }} ({{ user.email }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <!-- User Info Display -->
+                <div id="userInfo" class="card mb-3" style="{% if not selected_user %}display: none;{% endif %}">
+                  <div class="card-header bg-info">
+                    <h5 class="mb-0">User Information</h5>
+                  </div>
+                  <div class="card-body" id="userInfoContent">
+                    {% if selected_user %}
+                      <div class="row">
+                        <div class="col-md-6">
+                          <p><strong>Name:</strong> {{ selected_user.get_full_name|default:selected_user.username }}</p>
+                          <p><strong>Email:</strong> {{ selected_user.email }}</p>
+                          <p><strong>Username:</strong> {{ selected_user.username }}</p>
+                        </div>
+                        <div class="col-md-6">
+                          <p><strong>Status:</strong> 
+                            <span class="badge badge-{% if selected_user.is_active %}success{% else %}danger{% endif %}">
+                              {% if selected_user.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                          </p>
+                          <p><strong>Current Roles:</strong> 
+                            <span class="badge badge-primary">{{ selected_user.groups.count }}</span>
+                          </p>
+                        </div>
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Role Selection -->
+                <div id="roleSelection" class="{% if not selected_user %}d-none{% endif %}">
+                  <h4>Available Roles</h4>
+                  <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Select the roles you want to assign to this user.
+                    The user will inherit all permissions from the selected roles.
+                  </div>
+
+                  <div class="row">
+                    {% for group in groups %}
+                      <div class="col-md-6 mb-3">
+                        <div class="card">
+                          <div class="card-body">
+                            <div class="custom-control custom-checkbox">
+                              <input type="checkbox" class="custom-control-input" 
+                                     name="groups[]" 
+                                     value="{{ group.id }}" 
+                                     id="group-{{ group.id }}"
+                                     {% if group.id in user_groups %}checked{% endif %}>
+                              <label class="custom-control-label" for="group-{{ group.id }}">
+                                <strong>{{ group.name }}</strong>
+                              </label>
+                            </div>
+                            <p class="text-muted mt-2 mb-0">
+                              <i class="fas fa-key"></i> {{ group.permissions.count }} permissions
+                            </p>
+                            <button type="button" class="btn btn-sm btn-outline-info mt-2" 
+                                    data-toggle="modal" data-target="#roleModal{{ group.id }}">
+                              View Permissions
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- Modal for role permissions -->
+                      <div class="modal fade" id="roleModal{{ group.id }}" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                          <div class="modal-content">
+                            <div class="modal-header bg-info">
+                              <h5 class="modal-title">{{ group.name }} - Permissions</h5>
+                              <button type="button" class="close" data-dismiss="modal">
+                                <span>&times;</span>
+                              </button>
+                            </div>
+                            <div class="modal-body">
+                              {% if group.permissions.exists %}
+                                <div class="row">
+                                  {% for permission in group.permissions.all %}
+                                    <div class="col-md-6 mb-2">
+                                      <div class="d-flex align-items-center">
+                                        <i class="fas fa-check-circle text-success mr-2"></i>
+                                        <span>{{ permission.name }}</span>
+                                      </div>
+                                    </div>
+                                  {% endfor %}
+                                </div>
+                              {% else %}
+                                <div class="alert alert-warning">
+                                  This role has no permissions assigned.
+                                </div>
+                              {% endif %}
+                            </div>
+                            <div class="modal-footer">
+                              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+
+                  <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                      <i class="fas fa-save"></i> Update User Roles
+                    </button>
+                    <button type="button" class="btn btn-warning" id="clearRoles">
+                      <i class="fas fa-times"></i> Clear All Roles
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <!-- /.card-body -->
+          </div>
+          <!-- /.card -->
+        </div>
+        <!-- /.col -->
+      </div>
+      <!-- /.row -->
+    </div>
+    <!-- /.container-fluid -->
+  </section>
+  <!-- /.content -->
+</div>
+<!-- /.content-wrapper -->
+{% endblock content %}
+
+{% block javascripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<script>
+  $(function() {
+    // Initialize Select2
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      placeholder: 'Choose a user...',
+      allowClear: true
+    });
+
+    // Handle user selection change
+    $('#user_id').on('change', function() {
+      var userId = $(this).val();
+      
+      if (userId) {
+        // Show user info and role selection
+        $('#userInfo').show();
+        $('#roleSelection').removeClass('d-none');
+          // Redirect to load user data
+        window.location.href = '{% url "assign_user_roles_to_user" 0 %}'.replace('0', userId);
+      } else {
+        // Hide user info and role selection
+        $('#userInfo').hide();
+        $('#roleSelection').addClass('d-none');
+      }
+    });
+
+    // Clear all roles button
+    $('#clearRoles').on('click', function() {
+      if (confirm('Are you sure you want to clear all roles for this user?')) {
+        $('input[name="groups[]"]').prop('checked', false);
+      }
+    });
+  });
+</script>
+{% endblock javascripts %}
