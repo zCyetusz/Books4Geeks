@@ -5,7 +5,23 @@
 {% block title %} Bills List {% endblock title %}
 
 <!-- Specific CSS goes HERE -->
-{% block stylesheets %}{% endblock stylesheets %}
+{% block stylesheets %}
+<style>
+  .book-details {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .book-item {
+    font-size: 0.9em;
+  }
+  .book-item:last-child {
+    border-bottom: none !important;
+  }
+  #bills-table td {
+    vertical-align: top;
+  }
+</style>
+{% endblock stylesheets %}
 
 {% block content %}
 
@@ -57,12 +73,12 @@
                   </div>
                 {% endfor %}
               {% endif %}
-              
-              <table id="bills-table" class="table table-bordered table-striped">
+                <table id="bills-table" class="table table-bordered table-striped">
                 <thead>
                   <tr>
                     <th>ID</th>
                     <th>Customer</th>
+                    <th>Books & Details</th>
                     <th>Total Bill</th>
                     <th>Date</th>
                     <th>Actions</th>
@@ -73,7 +89,23 @@
                     <tr>
                       <td>{{ bill.id }}</td>
                       <td>{{ bill.id_cus.cusname }}</td>
-                      <td>${{ bill.totalbill }}</td>
+                      <td>
+                        {% if bill.details %}
+                          <div class="book-details">
+                            {% for detail in bill.details %}
+                              <div class="book-item mb-1" style="padding: 3px 0; border-bottom: 1px solid #eee;">
+                                <strong>{{ detail.id_book.description }}</strong>
+                                <small class="text-muted d-block">
+                                  Qty: {{ detail.quantity }} × ${{ detail.price|floatformat:2 }} = ${{ detail.total|floatformat:2 }}
+                                </small>
+                              </div>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <span class="text-muted">No items</span>
+                        {% endif %}
+                      </td>
+                      <td><strong>${{ bill.totalbill|floatformat:2 }}</strong></td>
                       <td>{{ bill.date }}</td>
                       <td>
                         <a href="{% url 'bill_edit' bill.id %}" class="btn btn-info btn-sm ajax-link">
@@ -86,7 +118,7 @@
                     </tr>
                   {% empty %}
                     <tr>
-                      <td colspan="5" class="text-center">No bills found.</td>
+                      <td colspan="6" class="text-center">No bills found.</td>
                     </tr>
                   {% endfor %}
                 </tbody>

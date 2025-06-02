@@ -11,55 +11,799 @@
 <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
 <!-- Toastr -->
 <link rel="stylesheet" href="{% static 'plugins/toastr/toastr.min.css' %}">
-<style>
+<style>  /* Scanner viewport styling */
   #interactive.viewport {
     position: relative;
     width: 100%;
     height: 400px;
     overflow: hidden;
     text-align: center;
-    border: 3px solid #ddd;
-    border-radius: 5px;
+    border: 3px solid #007bff;
+    border-radius: 20px;
     margin-bottom: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 8px 32px rgba(0, 123, 255, 0.2);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  #interactive.viewport::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 3s infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { transform: translateX(-100%) translateY(-100%); }
+    50% { transform: translateX(100%) translateY(100%); }
+    100% { transform: translateX(-100%) translateY(-100%); }
   }
   
   #interactive.viewport img {
     max-width: 100%;
     max-height: 100%;
+    border-radius: 15px;
+    z-index: 2;
+    position: relative;
+  }
+    /* Enhanced card styling with glassmorphism */
+  .card {
+    border: none;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    overflow: hidden;
+    position: relative;
   }
   
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: all 0.6s;
+  }
+  
+  .card:hover::before {
+    left: 100%;
+  }
+  
+  .card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 20px 40px rgba(31, 38, 135, 0.4);
+  }
+  
+  .card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px 20px 0 0 !important;
+    border: none;
+    padding: 1.5rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .card-header::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.1) 100%);
+    animation: headerShine 4s infinite;
+  }
+  
+  @keyframes headerShine {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
+  }
+  
+  .card-header h3 {
+    margin: 0;
+    font-weight: 700;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    font-size: 1.25rem;
+    letter-spacing: 0.5px;
+    z-index: 2;
+    position: relative;
+  }
+  
+  .card-body {
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.9);
+    position: relative;
+  }
+  
+  /* Scanned books section */
   #scanned-books {
     max-height: 500px;
     overflow-y: auto;
+    border-radius: 15px;
   }
   
-  .scan-result {
-    margin-bottom: 10px;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    background-color: #f9f9f9;
+  #scanned-books::-webkit-scrollbar {
+    width: 12px;
   }
   
+  #scanned-books::-webkit-scrollbar-track {
+    background: linear-gradient(135deg, #f1f1f1 0%, #e9ecef 100%);
+    border-radius: 15px;
+  }
+  
+  #scanned-books::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    border: 2px solid #f1f1f1;
+  }
+  
+  #scanned-books::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  }
+    /* Enhanced table styling with modern design */
+  .table {
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    background: white;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  
+  .table thead th {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+    border: none;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    padding: 1.25rem 1rem;
+    position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  
+  .table thead th:first-child {
+    border-top-left-radius: 15px;
+  }
+  
+  .table thead th:last-child {
+    border-top-right-radius: 15px;
+  }
+  
+  .table tbody td {
+    vertical-align: middle;
+    padding: 1.25rem 1rem;
+    border-color: rgba(0, 0, 0, 0.05);
+    background: white;
+    position: relative;
+  }
+  
+  .table tbody tr {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+  }
+  
+  .table tbody tr::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+  }
+  
+  .table tbody tr:hover::before {
+    width: 4px;
+  }
+  
+  .table tbody tr:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    transform: translateX(10px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  }
+  
+  .table tfoot {
+    background: linear-gradient(135deg, #10ac84 0%, #01a3a4 100%);
+    color: white;
+    font-weight: bold;
+  }
+  
+  .table tfoot td {
+    border: none;
+    padding: 1.25rem 1rem;
+    font-size: 1.1rem;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  
+  .table tfoot td:first-child {
+    border-bottom-left-radius: 15px;
+  }
+  
+  .table tfoot td:last-child {
+    border-bottom-right-radius: 15px;
+  }
+    /* Advanced button enhancements with 3D effects */
+  .btn {
+    border-radius: 50px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    transition: all 0.6s;
+  }
+  
+  .btn:hover::before {
+    left: 100%;
+  }
+  
+  .btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  }
+  
+  .btn:active {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  
+  .btn-success {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+    color: white;
+  }
+  
+  .btn-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+  }
+  
+  .btn-danger {
+    background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+    color: white;
+  }
+  
+  .btn-info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+  }
+  
+  .btn-sm {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.875rem;
+  }
+    /* Enhanced alert styling with modern design */
+  .alert-info {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 2px solid #2196f3;
+    border-radius: 15px;
+    padding: 1.5rem 2rem;
+    color: #0d47a1;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.2);
+  }
+  
+  .alert-info::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(to bottom, #2196f3, #1976d2);
+  }
+  
+  .alert-info i {
+    color: #2196f3;
+    margin-right: 0.75rem;
+    font-size: 1.1rem;
+  }
+    /* Advanced form input styling */
+  .form-control {
+    border-radius: 15px;
+    border: 2px solid #e0e0e0;
+    padding: 1rem 1.5rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+    font-weight: 500;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.3rem rgba(102, 126, 234, 0.25);
+    transform: translateY(-2px) scale(1.02);
+    background: white;
+    outline: none;
+  }
+  
+  .form-control::placeholder {
+    color: #9e9e9e;
+    font-style: italic;
+  }
+  
+  .input-group .form-control {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+  }
+  
+  .input-group .form-control:focus {
+    border-right: 2px solid #667eea;
+  }
+  
+  .input-group-append .btn {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 15px;
+    border-bottom-right-radius: 15px;
+  }
+  
+  /* Enhanced select styling */
+  select.form-control {
+    background-image: linear-gradient(45deg, transparent 50%, #667eea 50%), linear-gradient(135deg, #667eea 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(1em + 2px), calc(100% - 15px) calc(1em + 2px);
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2.5rem;
+  }
+  
+  /* Number input styling */
+  input[type="number"] {
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    padding: 0.5rem;
+    text-align: center;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+  
+  input[type="number"]:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    transform: scale(1.05);
+  }
+  
+  /* Loading spinner */
   .loading-spinner {
     display: none;
     text-align: center;
-    margin: 20px 0;
+    margin: 30px 0;
+    position: relative;
   }
   
-  /* Table styling */
-  #scanned-books table {
-    width: 100%;
+  .loading-spinner::before {
+    content: '';
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
   
-  #scanned-books table th,
-  #scanned-books table td {
-    vertical-align: middle;
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   
-  #scanned-books table tfoot {
-    font-weight: bold;
-    background-color: #f4f6f9;
+  /* Icon styling */
+  .fas, .far {
+    margin-right: 0.75rem;
+    transition: all 0.3s ease;
+  }
+  
+  .btn:hover .fas,
+  .btn:hover .far {
+    transform: scale(1.1);
+  }
+    /* Enhanced create bill section with modern styling */
+  .create-bill-section {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    border: 3px dashed #667eea;
+    border-radius: 20px;
+    padding: 2rem;
+    margin: 1.5rem 0;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .create-bill-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+    animation: sectionShimmer 4s infinite;
+  }
+  
+  @keyframes sectionShimmer {
+    0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+  }
+  
+  .create-bill-section:hover {
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+    border-color: #764ba2;
+  }
+  
+  .create-bill-section h6 {
+    color: #667eea;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    z-index: 2;
+    position: relative;
+  }
+  
+  /* Enhanced empty state styling */
+  .empty-state {
+    padding: 4rem 2rem;
+    text-align: center;
+    color: #9e9e9e;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .empty-state::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="%23667eea" opacity="0.1"><animate attributeName="opacity" dur="3s" repeatCount="indefinite" values="0.1;0.3;0.1"/></circle><circle cx="80" cy="80" r="2" fill="%23764ba2" opacity="0.1"><animate attributeName="opacity" dur="3s" repeatCount="indefinite" values="0.1;0.3;0.1" begin="1s"/></circle></svg>');
+  }
+  
+  .empty-state i {
+    opacity: 0.4;
+    margin-bottom: 1.5rem;
+    font-size: 4rem;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: pulse 2s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  
+  .empty-state p {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 0;
+    z-index: 2;
+    position: relative;
+  }
+  
+  /* Breadcrumb styling */
+  .breadcrumb {
+    background: transparent;
+    padding: 0;
+  }
+  
+  .breadcrumb-item + .breadcrumb-item::before {
+    color: #6c757d;
+  }
+  
+  /* Enhanced page title styling */
+  .content-header h1 {
+    color: #2c3e50;
+    font-weight: 800;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    font-size: 2.5rem;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0;
+    position: relative;
+  }
+  
+  .content-header h1::after {
+    content: '';
+    position: absolute;
+    bottom: -10px;
+    left: 0;
+    width: 60px;
+    height: 4px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-radius: 2px;
+  }
+  
+  /* Enhanced badge styling for scan methods */
+  .scan-badge {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Enhanced table row highlighting */
+  .table-info {
+    background: linear-gradient(135deg, rgba(79, 172, 254, 0.15) 0%, rgba(0, 242, 254, 0.15) 100%) !important;
+    border-left: 4px solid #4facfe;
+  }
+  
+  .table-warning {
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.15) 0%, rgba(245, 87, 108, 0.15) 100%) !important;
+    border-left: 4px solid #f093fb;
+  }
+  
+  /* Enhanced modal styling */
+  .modal-content {
+    border-radius: 20px;
+    border: none;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+  
+  .modal-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+  }
+  
+  .modal-title {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  
+  .modal-body {
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+  }
+  
+  .modal-footer {
+    background: rgba(248, 249, 250, 0.9);
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 1.5rem 2rem;
+  }
+  
+  /* Debug section styling */
+  .debug-section {
+    background: linear-gradient(135deg, rgba(248, 249, 250, 0.8) 0%, rgba(233, 236, 239, 0.8) 100%);
+    border: 2px dashed #667eea;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    transition: all 0.3s ease;
+  }
+  
+  .debug-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
+  }
+  
+  .debug-section h6 {
+    color: #667eea;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  
+  .debug-section select,
+  .debug-section button {
+    transition: all 0.3s ease;
+  }
+  
+  .debug-section select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+  }
+  
+  /* Page title styling */
+  .content-header h1 {
+    color: #2c3e50;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Badge styling for scan methods */
+  .scan-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 15px;
+    font-weight: 500;
+  }
+  
+  /* Row hover effects */
+  .table-info {
+    background-color: rgba(23, 162, 184, 0.1) !important;
+  }
+  
+  .table-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .card-body {
+      padding: 1rem;
+    }
+    
+    .btn {
+      padding: 0.375rem 1rem;
+      font-size: 0.875rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.875rem;
+    }
+  }
+  
+  /* Global background styling */
+  body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+  }
+  
+  .content-wrapper {
+    background: transparent;
+  }
+  
+  /* Enhanced container styling */
+  .container-fluid {
+    position: relative;
+  }
+  
+  /* Floating action effects */
+  .card-tools .btn {
+    margin-left: 0.5rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  
+  .card-tools .btn:hover {
+    transform: translateY(-3px) scale(1.1);
+  }
+  
+  /* Enhanced text styling */
+  .text-muted {
+    color: #6c757d !important;
+    font-weight: 500;
+  }
+  
+  strong {
+    font-weight: 700;
+    color: #2c3e50;
+  }
+  
+  /* Enhanced input group styling */
+  .input-group {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 15px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .input-group:focus-within {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  }
+  
+  /* Quantity input special styling */
+  input[type="number"] {
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    padding: 0.5rem;
+    text-align: center;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: white;
+    width: 70px;
+  }
+  
+  input[type="number"]:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    transform: scale(1.05);
+    outline: none;
+  }
+  
+  /* Enhanced alert responsiveness */
+  @media (max-width: 768px) {
+    .content-header h1 {
+      font-size: 2rem;
+    }
+    
+    .card-body {
+      padding: 1.25rem;
+    }
+    
+    .btn {
+      padding: 0.5rem 1.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+      padding: 1rem 0.75rem;
+      font-size: 0.875rem;
+    }
+    
+    .modal-body {
+      padding: 1.5rem;
+    }
+    
+    .alert-info {
+      padding: 1.25rem 1.5rem;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .content-header h1 {
+      font-size: 1.75rem;
+    }
+    
+    .card {
+      margin-bottom: 1rem;
+    }
+    
+    .btn {
+      padding: 0.4rem 1.2rem;
+      font-size: 0.8rem;
+    }
+    
+    .table thead th,
+    .table tbody td {
+      padding: 0.75rem 0.5rem;
+      font-size: 0.8rem;
+    }
   }
 </style>
 {% endblock stylesheets %}
@@ -123,70 +867,107 @@
                         <i class="fas fa-info-circle"></i> Clicking "Start Scanner" will open the camera on the server computer. 
                         You will see a camera window where barcodes will be scanned. Press 'c' key to complete scanning and return to the web interface.
                       </div>
-                      
-                      <form id="manual-barcode-form" class="form-group mt-3" onsubmit="return false;">
+                        <form method="post" class="form-group mt-3">
                         {% csrf_token %}
+                        <input type="hidden" name="action" value="add_manual_barcode">
                         <label for="barcode-manual">Or enter barcode manually:</label>
                         <div class="input-group">
-                          <input type="text" id="barcode-manual" class="form-control" placeholder="Enter barcode number">
+                          <input type="text" name="barcode_number" class="form-control" placeholder="Enter barcode number" required>
                           <div class="input-group-append">
-                            <button type="button" id="lookup-barcode" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary">
                               <i class="fas fa-search"></i> Lookup
                             </button>
                           </div>
                         </div>
                       </form>
                       
-                      <div class="loading-spinner" id="loading-spinner">
-                        <i class="fas fa-spinner fa-spin fa-2x"></i>
-                        <div>Processing barcode...</div>
+                      <div class="mt-2">
+                        <a href="{% url 'test_barcode_scan' %}" class="btn btn-info btn-sm">
+                          <i class="fas fa-flask"></i> Test Scan (Demo)
+                        </a>
                       </div>
                     </div>
-                  </div>
-                  
-                  <!-- Customer Selection -->
-                  <div class="card mt-3">
-                    <div class="card-header">
-                      <h3 class="card-title">
-                        <i class="fas fa-user"></i> Customer Selection
-                      </h3>
-                    </div>
-                    <div class="card-body">
-                      <div class="form-group">
-                        <label for="customer-select">Select Customer:</label>
-                        <select class="form-control select2" id="customer-select" required>
-                          <option value="">Select a customer</option>
-                          {% for customer in customers %}
-                          <option value="{{ customer.id }}">{{ customer.cusname }}</option>
-                          {% endfor %}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-md-5">
-                  <!-- Scanned Books Section -->
-                  <div class="card">
-                    <div class="card-header">
-                      <h3 class="card-title">
-                        <i class="fas fa-list"></i> Scanned Books
-                      </h3>
-                      <div class="card-tools">
-                        <button type="button" id="create-bill-button" class="btn btn-primary btn-sm" disabled>
-                          <i class="fas fa-shopping-cart"></i> Create Bill
-                        </button>
-                        <button type="button" id="clear-button" class="btn btn-warning btn-sm" disabled>
+                  </div>                  
+                                 <!-- Scanned Books Section -->
+                <div class="card">
+                  <div class="card-header">                    <h3 class="card-title">
+                      <i class="fas fa-list"></i> Scanned Books ({{ scanned_books_count }})
+                    </h3>                    <div class="card-tools">
+                      <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to clear all books?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="clear_all">
+                        <button type="submit" class="btn btn-warning btn-sm" {% if scanned_books_count == 0 %}disabled{% endif %}>
                           <i class="fas fa-trash"></i> Clear List
                         </button>
-                      </div>
+                      </form>
                     </div>
-                    <div class="card-body">
-                      <div id="scanned-books" class="scanned-books">
-                        <div class="text-muted text-center">
-                          <i class="fas fa-barcode fa-3x mb-3"></i>
-                          <p>Scan a barcode to add books to the list.</p>
-                        </div>
+                  </div>
+                  <div class="card-body">
+                    {% if scanned_books %}
+                      <table class="table table-striped table-hover">
+                        <thead>
+                          <tr>
+                            <th>Book</th>
+                            <th>Price</th>
+                            <th>Qty</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for book in scanned_books %}
+                          <tr {% if book.scanned_by == 'camera' %}class="table-info"{% elif book.scanned_by == 'manual' %}class="table-warning"{% endif %}>
+                            <td>
+                              {% if book.scanned_by == 'camera' %}
+                                <i class="fas fa-camera text-info mr-1" title="Camera scanned"></i>
+                              {% elif book.scanned_by == 'manual' %}
+                                <i class="fas fa-keyboard text-warning mr-1" title="Manually entered"></i>
+                              {% endif %}
+                              <div><strong>{{ book.description }}</strong></div>
+                              {% if book.authors %}
+                                <div class="small text-muted">By: {% for author in book.authors %}{{ author }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                              {% endif %}
+                              {% if book.categories %}
+                                <div class="small text-muted">Categories: {% for category in book.categories %}{{ category }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+                              {% endif %}
+                            </td>                            <td>${{ book.price }}</td>
+                            <td>
+                              <form method="post" style="display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_quantity">
+                                <input type="hidden" name="book_index" value="{{ forloop.counter0 }}">
+                                <input type="number" name="quantity" value="{{ book.quantity }}" min="1" max="100" style="width: 60px;" onchange="this.form.submit();">
+                              </form>
+                            </td>
+                            <td>${{ book.total|floatformat:2 }}</td>
+                            <td>
+                              <form method="post" style="display: inline;" onsubmit="return confirm('Remove this book?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="remove_book">
+                                <input type="hidden" name="book_index" value="{{ forloop.counter0 }}">
+                                <button type="submit" class="btn btn-danger btn-sm" title="Remove Book">
+                                  <i class="fas fa-trash"></i>
+                                </button>
+                              </form>
+                            </td>
+                          </tr>
+                          {% endfor %}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colspan="3" class="text-right"><strong>Grand Total:</strong></td>
+                            <td colspan="2"><strong>${{ total_amount|floatformat:2 }}</strong></td>
+                          </tr>
+                        </tfoot>
+                      </table>                    {% else %}
+                      <div class="empty-state">
+                        <i class="fas fa-barcode fa-4x mb-3"></i>
+                        <p>Scan a barcode or enter one manually to add books to your list.</p>
+                        <small class="text-muted">Use the camera scanner or manual input above</small>
                       </div>
+                    {% endif %}
+                  </div>
+                </div>
                       
                       <!-- Book Quantity Edit Modal -->
                       <div class="modal fade" id="quantityModal" tabindex="-1" role="dialog" aria-labelledby="quantityModalLabel" aria-hidden="true">
@@ -215,9 +996,30 @@
                             </div>
                           </div>
                         </div>
+                      </div>                      </div>
+                        <!-- Enhanced Create Bill Section -->
+                      <div class="debug-section">
+                        <h6><i class="fas fa-plus-circle"></i> Create Bill</h6>
+                        <form method="post">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="create_bill">
+                          <div class="form-group mb-3">
+                            <label for="customer_select" class="form-label">
+                              <i class="fas fa-user"></i> Select Customer:
+                            </label>
+                            <select name="customer_id" id="customer_select" class="form-control" required>
+                              <option value="">Choose a customer...</option>
+                              {% for customer in customers %}
+                              <option value="{{ customer.id }}">{{ customer.cusname }} (ID: {{ customer.id }})</option>
+                              {% endfor %}
+                            </select>
+                          </div>
+                          <button type="submit" class="btn btn-success">
+                            <i class="fas fa-receipt"></i> Create Bill
+                          </button>
+                        </form>
                       </div>
                     </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -267,15 +1069,19 @@ $(function () {
     } catch (e) {
       console.error("Error loading books from session storage:", e);
     }
-  }
-  
-  // Then check if there are desktop scanned books from Django
-  {% if desktop_scanned_books %}
+  }    // Then check if there are desktop scanned books from Django
+  {% if desktop_scanned_books_json %}
+    console.log("Desktop scanned books JSON found!");
+    console.log("Raw JSON:", '{{ desktop_scanned_books_json|safe }}');
+    
     // Merge with existing books
-    var desktopBooks = {{ desktop_scanned_books|safe }};
+    var desktopBooks = {{ desktop_scanned_books_json|safe }};
+    console.log("Parsed desktop books:", desktopBooks);
+    console.log("Number of desktop books:", desktopBooks.length);
     
     // Add desktop books that aren't already in the list
     desktopBooks.forEach(function(newBook) {
+      console.log("Processing book:", newBook);
       var exists = false;
       for (var i = 0; i < scannedBooks.length; i++) {
         if (scannedBooks[i].id === newBook.id) {
@@ -290,12 +1096,16 @@ $(function () {
         if (!newBook.hasOwnProperty('scanned_by')) {
           newBook.scanned_by = 'camera';
         }
+        console.log("Adding new book to scannedBooks array:", newBook);
         scannedBooks.push(newBook);
       }
     });
     
+    console.log("Final scannedBooks array:", scannedBooks);
     updateScannedBooksList();
-    toastr.info('Added camera-scanned books to the list');
+    toastr.success('Added ' + desktopBooks.length + ' camera-scanned books to the list');
+  {% else %}
+    console.log("No desktop scanned books JSON found");
   {% endif %}
   
   // Manual lookup form submission
@@ -332,14 +1142,11 @@ $(function () {
         $(this).val('');
       }
       return false; // Prevent default
-    }
-  });
-  
-  // Create bill button
-  $('#create-bill-button').on('click', function() {
-    createBillFromScannedBooks();
-  });
-  
+    }  });    // Function to validate create bill form before submission (legacy - now handled by form submit handler)
+  function validateCreateBill() {
+    console.log('Legacy validateCreateBill called - this should not be used anymore');
+    return true; // Allow submission since we handle validation in the form submit handler  }
+
   // Clear button
   $('#clear-button').on('click', function() {
     clearScannedBooks();
@@ -474,13 +1281,14 @@ $(function () {
     // Play success sound
     playSound('success');
   }
-  
-  // Update the scanned books list
+    // Update the scanned books list
   function updateScannedBooksList() {
+    console.log("updateScannedBooksList called with:", scannedBooks);
     var container = $('#scanned-books');
     container.empty();
     
     if (scannedBooks.length === 0) {
+      console.log("No scanned books, showing empty message");
       container.html('<div class="text-muted text-center"><i class="fas fa-barcode fa-3x mb-3"></i><p>Scan a barcode to add books to the list.</p></div>');
       $('#create-bill-button').prop('disabled', true);
       $('#clear-button').prop('disabled', true);
@@ -489,6 +1297,8 @@ $(function () {
       sessionStorage.removeItem('scannedBooks');
       return;
     }
+    
+    console.log("Building table for", scannedBooks.length, "books");
     
     // Save to session storage
     sessionStorage.setItem('scannedBooks', JSON.stringify(scannedBooks));
@@ -740,4 +1550,4 @@ $(function () {
   }
 });
 </script>
-{% endblock javascripts %} 
+{% endblock javascripts %}

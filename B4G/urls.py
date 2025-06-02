@@ -81,6 +81,7 @@ urlpatterns = [
     path('bills/edit/<int:pk>/', views.bill_edit, name='bill_edit'),
     path('bills/delete/<int:pk>/', views.bill_delete, name='bill_delete'),
     path('bills/scan-barcode/', views.bill_scan_barcode, name='bill_scan_barcode'),
+    path('bills/test-barcode-scan/', views.test_barcode_scan, name='test_barcode_scan'),
     path('bills/start-camera/', views.start_camera, name='start_camera'),
     path('bills/stop-camera/', views.stop_camera, name='stop_camera'),
     path('bills/video-feed/', views.video_feed, name='video_feed'),
@@ -106,4 +107,4 @@ urlpatterns = [
     path('roles/delete/<int:pk>/', views.role_delete, name='role_delete'),
     path('roles/assign/', views.assign_user_roles, name='assign_user_roles'),
     path('roles/assign/<int:user_id>/', views.assign_user_roles, name='assign_user_roles_to_user'),
-] 
+]

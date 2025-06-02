@@ -560,7 +560,15 @@ def import_create(request):
 # Bill Views
 @login_required
 def bill_list(request):
-    bills = Bills.objects.all()
+    # Get all bills with related customer data and prefetch related bill details
+    bills = Bills.objects.select_related('id_cus').prefetch_related(
+        'billdetails_set__id_book'
+    ).all()
+    
+    # Add bill details to each bill for template display
+    for bill in bills:
+        bill.details = bill.billdetails_set.all()
+    
     template = 'bill/list.html'
     
     # Check if this is an AJAX request
@@ -751,15 +759,156 @@ def bill_scan_barcode(request):
     books = Books.objects.all()
     customers = Customers.objects.all()
     
-    # Check if there are desktop-scanned books in the session
+    # Get scanned books from session (don't pop yet, we'll manage them differently)
+    scanned_books = request.session.get('scanned_books', [])
+    
+    # Handle POST requests for manual barcode entry and other actions
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'add_manual_barcode':
+            barcode_number = request.POST.get('barcode_number', '').strip()
+            if barcode_number:
+                try:
+                    book = Books.objects.get(barcode_number=barcode_number)
+                    # Get author and category information
+                    authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+                    categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+                    
+                    # Check if book already exists in scanned list
+                    book_exists = False
+                    for i, scanned_book in enumerate(scanned_books):
+                        if scanned_book['id'] == book.id:
+                            scanned_books[i]['quantity'] += 1
+                            book_exists = True
+                            break
+                    
+                    if not book_exists:
+                        scanned_books.append({
+                            'id': book.id,
+                            'description': book.description,
+                            'price': str(book.price),
+                            'quantity': 1,
+                            'publisher': book.id_pub.pubname if book.id_pub else None,
+                            'authors': authors,
+                            'categories': categories,                            'scanned_by': 'manual'
+                        })
+                    
+                    request.session['scanned_books'] = scanned_books
+                    messages.success(request, f"Added book: {book.description}")
+                    
+                except Books.DoesNotExist:
+                    messages.error(request, f"Book with barcode {barcode_number} not found")
+        
+        elif action == 'remove_book':
+            book_index = int(request.POST.get('book_index', -1))
+            if 0 <= book_index < len(scanned_books):
+                removed_book = scanned_books.pop(book_index)
+                request.session['scanned_books'] = scanned_books
+                messages.success(request, f"Removed book: {removed_book['description']}")
+        
+        elif action == 'clear_all':
+            request.session['scanned_books'] = []
+            scanned_books = []
+            messages.success(request, "Cleared all scanned books")
+        
+        elif action == 'update_quantity':
+            book_index = int(request.POST.get('book_index', -1))
+            new_quantity = int(request.POST.get('quantity', 1))
+            if 0 <= book_index < len(scanned_books) and new_quantity > 0:
+                scanned_books[book_index]['quantity'] = new_quantity
+                request.session['scanned_books'] = scanned_books
+                messages.success(request, "Quantity updated successfully")
+        
+        elif action == 'create_bill':
+            print(f"DEBUG: Create bill action triggered")
+            customer_id = request.POST.get('customer_id')
+            print(f"DEBUG: Customer ID received: {customer_id}")
+            print(f"DEBUG: Scanned books count: {len(scanned_books)}")
+            print(f"DEBUG: POST data: {request.POST}")
+            
+            if not customer_id or not scanned_books:
+                if not customer_id:
+                    print("DEBUG: No customer selected")
+                if not scanned_books:
+                    print("DEBUG: No scanned books")
+                messages.error(request, "Please select a customer and add at least one book")
+                return redirect('bill_scan_barcode')
+            
+            try:
+                # Get customer
+                customer = get_object_or_404(Customers, pk=customer_id)
+                
+                # Calculate total
+                total_bill = 0
+                for book_data in scanned_books:
+                    total_bill += float(book_data.get('price', 0)) * int(book_data.get('quantity', 1))
+                
+                # Create bill
+                bill = Bills.objects.create(
+                    id_cus=customer,
+                    totalbill=str(total_bill)
+                )
+                
+                # Create bill details
+                for book_data in scanned_books:
+                    book = get_object_or_404(Books, pk=book_data.get('id'))
+                    quantity = int(book_data.get('quantity', 1))
+                    price = float(book_data.get('price', 0))
+                    total = price * quantity
+                    Billdetails.objects.create(
+                        id_book=book,
+                        id_bill=bill,
+                        quantity=quantity,
+                        price=price,
+                        total=str(total)
+                    )
+                
+                # Clear scanned books from session
+                request.session['scanned_books'] = []
+                
+                messages.success(request, f"Bill #{bill.id} created successfully for {customer.cusname}! Total: ${total_bill:.2f}")
+                return redirect('bill_list')
+                
+            except Exception as e:
+                messages.error(request, f"Error creating bill: {str(e)}")
+                return redirect('bill_scan_barcode')
+        
+        # Redirect to prevent form resubmission
+        return redirect('bill_scan_barcode')
+    
+    # Check if there are desktop-scanned books from camera scanning
     desktop_scanned_books = request.session.pop('desktop_scanned_books', None)
+    if desktop_scanned_books:
+        # Merge desktop scanned books with existing scanned books
+        for new_book in desktop_scanned_books:
+            book_exists = False
+            for i, existing_book in enumerate(scanned_books):
+                if existing_book['id'] == new_book['id']:
+                    scanned_books[i]['quantity'] += new_book['quantity']
+                    book_exists = True
+                    break
+            
+            if not book_exists:
+                scanned_books.append(new_book)
+        
+        request.session['scanned_books'] = scanned_books
+        messages.success(request, f"Added {len(desktop_scanned_books)} camera-scanned books")
+      # Calculate total
+    total_amount = 0
+    for book in scanned_books:
+        book_total = float(book['price']) * book['quantity']
+        book['total'] = book_total  # Add total to each book for template use
+        total_amount += book_total
     
     # Context for rendering the template
     context = {
         'books': books,
         'customers': customers,
         'page_title': 'Scan Barcode',
-        'desktop_scanned_books': desktop_scanned_books
+        'scanned_books': scanned_books,
+        'total_amount': total_amount,
+        'scanned_books_count': len(scanned_books)
     }
     
     return render(request, 'bill/scan_barcode.html', context)
@@ -1809,30 +1958,79 @@ def scan_barcode_desktop(request):
             count_text = f"Books: {len(scanned_books)}"
             cv2.putText(frame, count_text, (10, frame.shape[0] - 10), 
                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-            
-            # Display the frame
+              # Display the frame
             cv2.imshow("Books4Geeks Barcode Scanner", frame)
             
             # Break if 'c' is pressed or window is closed
-            key = cv2.waitKey(10) 
+            key = cv2.waitKey(1) & 0xFF
             if key == ord('c') or key == 27:  # 'c' or ESC key
+                break
+            
+            # Check if window was closed
+            if cv2.getWindowProperty("Books4Geeks Barcode Scanner", cv2.WND_PROP_VISIBLE) < 1:
                 break
         
         # Clean up
         cap.release()
         cv2.destroyAllWindows()
-        
-        # Store scanned books in session
+          # Store scanned books in session
         if scanned_books:
             request.session['desktop_scanned_books'] = scanned_books
+            print(f"DEBUG: Stored {len(scanned_books)} books in session")
+            print(f"DEBUG: Sample book data: {scanned_books[0] if scanned_books else 'None'}")
             messages.success(request, f"Successfully scanned {len(scanned_books)} books")
         else:
             messages.info(request, "No books were scanned")
         
     except Exception as e:
+        print(f"ERROR in scan_barcode_desktop: {str(e)}")
         messages.error(request, f"Error during barcode scanning: {str(e)}")
     
     # Always redirect back to the scan_barcode page
+    return redirect('bill_scan_barcode')
+
+@login_required
+def test_barcode_scan(request):
+    """
+    Test function to simulate barcode scanning without camera
+    """
+    try:
+        # Get some books with barcodes
+        books = Books.objects.filter(barcode_number__isnull=False).exclude(barcode_number='')[:2]
+        
+        if not books.exists():
+            messages.error(request, "No books with barcodes found for testing")
+            return redirect('bill_scan_barcode')
+        
+        # Simulate scanned books
+        scanned_books = []
+        for book in books:
+            # Get author and category information
+            authors = [ba.id_author.authorname for ba in Bookauthors.objects.filter(id_book=book)]
+            categories = [bc.id_cat.catname for bc in Bookcategories.objects.filter(id_book=book)]
+            
+            scanned_books.append({
+                'id': book.id,
+                'description': book.description,
+                'price': str(book.price),
+                'quantity': 1,
+                'publisher': book.id_pub.pubname if book.id_pub else None,
+                'authors': authors,
+                'categories': categories,
+                'scanned_by': 'camera'
+            })
+        
+        # Store in session
+        request.session['desktop_scanned_books'] = scanned_books
+        print(f"DEBUG TEST: Stored {len(scanned_books)} test books in session")
+        print(f"DEBUG TEST: Sample book: {scanned_books[0]}")
+        
+        messages.success(request, f"Test: Added {len(scanned_books)} books to session")
+        
+    except Exception as e:
+        print(f"ERROR in test_barcode_scan: {str(e)}")
+        messages.error(request, f"Error in test: {str(e)}")
+    
     return redirect('bill_scan_barcode')
 
 def export_full_database(changed_model=None):

@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-05-21 22:29:50",
+  "timestamp": "2025-06-02 21:33:28",
   "exported_models": {
     "UserProfile": 0,
     "Publishers": 2,
@@ -10,8 +10,8 @@
     "Bookcategories": 7,
     "Imports": 0,
     "Customers": 1,
-    "Bills": 0,
-    "Billdetails": 0,
+    "Bills": 6,
+    "Billdetails": 7,
     "Areas": 0,
     "Shelves": 0,
     "Bookshelves": 0,
@@ -20,5 +20,5 @@
     "ReservationItems": 2
   },
   "total_models": 17,
-  "total_records": 31
+  "total_records": 44
 }
