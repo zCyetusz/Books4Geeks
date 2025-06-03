@@ -37,12 +37,15 @@ from django.dispatch import receiver
 def register(request):
   if request.method == 'POST':
     form = RegistrationForm(request.POST)
-    if form.is_saved():
-      form.save()
-      print('Account created successfully!')
-      return redirect('/accounts/login/')
+    if form.is_valid():
+      try:
+        user = form.save()
+        messages.success(request, f'Account created successfully for {user.username}! You can now log in.')
+        return redirect('/accounts/login/')
+      except Exception as e:
+        messages.error(request, f'Error creating account: {str(e)}')
     else:
-      print("Registration failed!")
+      messages.error(request, 'Registration failed! Please check the form for errors.')
   else:
     form = RegistrationForm()
   
@@ -53,11 +56,14 @@ def register_v1(request):
   if request.method == 'POST':
     form = RegistrationForm(request.POST)
     if form.is_valid():
-      form.save()
-      print('Account created successfully!')
-      return redirect('/accounts/login/')
+      try:
+        user = form.save()
+        messages.success(request, f'Account created successfully for {user.username}! You can now log in.')
+        return redirect('/accounts/login/')
+      except Exception as e:
+        messages.error(request, f'Error creating account: {str(e)}')
     else:
-      print("Registration failed!")
+      messages.error(request, 'Registration failed! Please check the form for errors.')
   else:
     form = RegistrationForm()
   
@@ -68,11 +74,14 @@ def register_v2(request):
   if request.method == 'POST':
     form = RegistrationForm(request.POST)
     if form.is_valid():
-      form.save()
-      print('Account created successfully!')
-      return redirect('/accounts/login/')
+      try:
+        user = form.save()
+        messages.success(request, f'Account created successfully for {user.username}! You can now log in.')
+        return redirect('/accounts/login/')
+      except Exception as e:
+        messages.error(request, f'Error creating account: {str(e)}')
     else:
-      print("Registration failed!")
+      messages.error(request, 'Registration failed! Please check the form for errors.')
   else:
     form = RegistrationForm()
   
@@ -2515,18 +2524,13 @@ def assign_user_roles(request, user_id=None):
     from django.contrib.auth.models import Group
     from django.http import JsonResponse
     
-    if user_id:
-        user = get_object_or_404(User, pk=user_id)
-    else:
-        user = None
-    
     # Handle AJAX requests for user data
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('user_id'):
-        ajax_user_id = request.GET.get('user_id')
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('ajax_user_id'):
+        ajax_user_id = request.GET.get('ajax_user_id')
         ajax_user = get_object_or_404(User, pk=ajax_user_id)
         user_groups = [g.id for g in ajax_user.groups.all()]
-        
         return JsonResponse({
+            'success': True,
             'user': {
                 'id': ajax_user.id,
                 'username': ajax_user.username,
@@ -2536,6 +2540,12 @@ def assign_user_roles(request, user_id=None):
             },
             'user_groups': user_groups
         })
+    
+    # Set user if provided via URL parameter
+    if user_id:
+        user = get_object_or_404(User, pk=user_id)
+    else:
+        user = None
     
     if request.method == 'POST':
         user_id = request.POST.get('user_id')

@@ -110,13 +110,11 @@
                       </div>
                     {% endif %}
                   </div>
-                </div>
-
-                <!-- Role Selection -->
-                <div id="roleSelection" class="{% if not selected_user %}d-none{% endif %}">
+                </div>                <!-- Role Selection -->
+                <div id="roleSelection">
                   <h4>Available Roles</h4>
                   <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> Select the roles you want to assign to this user.
+                    <i class="fas fa-info-circle"></i> Select a user first, then choose the roles you want to assign.
                     The user will inherit all permissions from the selected roles.
                   </div>
 
@@ -181,13 +179,11 @@
                         </div>
                       </div>
                     {% endfor %}
-                  </div>
-
-                  <div class="mt-4">
-                    <button type="submit" class="btn btn-primary">
+                  </div>                  <div class="mt-4">
+                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
                       <i class="fas fa-save"></i> Update User Roles
                     </button>
-                    <button type="button" class="btn btn-warning" id="clearRoles">
+                    <button type="button" class="btn btn-warning" id="clearRoles" disabled>
                       <i class="fas fa-times"></i> Clear All Roles
                     </button>
                   </div>
@@ -219,29 +215,91 @@
       theme: 'bootstrap4',
       placeholder: 'Choose a user...',
       allowClear: true
-    });
-
-    // Handle user selection change
+    });    // Handle user selection change
     $('#user_id').on('change', function() {
       var userId = $(this).val();
       
       if (userId) {
-        // Show user info and role selection
-        $('#userInfo').show();
-        $('#roleSelection').removeClass('d-none');
-          // Redirect to load user data
-        window.location.href = '{% url "assign_user_roles_to_user" 0 %}'.replace('0', userId);
+        // Always enable buttons first
+        $('#submitBtn, #clearRoles').prop('disabled', false);
+        
+        // Load user data via AJAX
+        $.ajax({
+          url: '{% url "assign_user_roles" %}',
+          method: 'GET',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          data: {
+            'ajax_user_id': userId
+          },
+          success: function(response) {
+            if (response.success) {
+              // Update user info
+              var userInfo = response.user;
+              var userGroups = response.user_groups;
+              
+              var userInfoHtml = `
+                <div class="row">
+                  <div class="col-md-6">
+                    <p><strong>Name:</strong> ${userInfo.full_name || userInfo.username}</p>
+                    <p><strong>Email:</strong> ${userInfo.email}</p>
+                    <p><strong>Username:</strong> ${userInfo.username}</p>
+                  </div>
+                  <div class="col-md-6">
+                    <p><strong>Status:</strong> 
+                      <span class="badge badge-${userInfo.is_active ? 'success' : 'danger'}">
+                        ${userInfo.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </p>
+                    <p><strong>Current Roles:</strong> 
+                      <span class="badge badge-primary">${userGroups.length}</span>
+                    </p>
+                  </div>
+                </div>
+              `;
+              
+              $('#userInfoContent').html(userInfoHtml);
+              $('#userInfo').show();
+              
+              // Enable action buttons
+              $('#submitBtn, #clearRoles').prop('disabled', false);
+              
+              // Update role checkboxes
+              $('input[name="groups[]"]').each(function() {
+                var groupId = parseInt($(this).val());
+                $(this).prop('checked', userGroups.includes(groupId));
+              });
+            }
+          },          error: function(xhr, status, error) {
+            console.error('AJAX Error:', error);
+            console.log('Response:', xhr.responseText);
+            // Buttons are already enabled above, so just show user info
+            $('#userInfo').show();
+          }
+        });
       } else {
-        // Hide user info and role selection
+        // Hide user info and disable buttons
         $('#userInfo').hide();
-        $('#roleSelection').addClass('d-none');
+        $('#submitBtn, #clearRoles').prop('disabled', true);
+        // Clear checkboxes
+        $('input[name="groups[]"]').prop('checked', false);
       }
-    });
-
+    });    
     // Clear all roles button
     $('#clearRoles').on('click', function() {
       if (confirm('Are you sure you want to clear all roles for this user?')) {
         $('input[name="groups[]"]').prop('checked', false);
+      }
+    });
+
+    // Form submission validation
+    $('#userRoleForm').on('submit', function(e) {
+      var userId = $('#user_id').val();
+      if (!userId) {
+        e.preventDefault();
+        alert('Please select a user first!');
+        return false;
       }
     });
   });
