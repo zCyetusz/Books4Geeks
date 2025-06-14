@@ -93,6 +93,19 @@ urlpatterns = [
     path('customers/edit/<int:pk>/', views.customer_edit, name='customer_edit'),
     path('customers/delete/<int:pk>/', views.customer_delete, name='customer_delete'),
     
+    # Employees
+    path('employees/', views.employee_list, name='employee_list'),
+    path('employees/create/', views.employee_create, name='employee_create'),
+    path('employees/edit/<int:pk>/', views.employee_edit, name='employee_edit'),
+    path('employees/delete/<int:pk>/', views.employee_delete, name='employee_delete'),
+    
+    # Imports
+    path('imports/', views.import_list, name='import_list'),
+    path('imports/create/', views.import_create, name='import_create'),
+    path('imports/edit/<int:pk>/', views.import_edit, name='import_edit'),
+    path('imports/delete/<int:pk>/', views.import_delete, name='import_delete'),
+    path('imports/detail/<int:pk>/', views.import_detail, name='import_detail'),
+    
     # Reservations
     path('reservations/', views.reservation_list, name='reservation_list'),
     path('reservations/create/', views.reservation_create, name='reservation_create'),
@@ -107,4 +120,32 @@ urlpatterns = [
     path('roles/delete/<int:pk>/', views.role_delete, name='role_delete'),
     path('roles/assign/', views.assign_user_roles, name='assign_user_roles'),
     path('roles/assign/<int:user_id>/', views.assign_user_roles, name='assign_user_roles_to_user'),
+    
+    # Reports and Analytics
+    path('reports/', views.reports, name='reports'),
+    
+    # Smart Inventory Management
+    path('inventory/alerts/', views.inventory_alerts, name='inventory_alerts'),
+    path('inventory/analytics/', views.inventory_analytics, name='inventory_analytics'),
+    path('inventory/purchase-order/', views.generate_purchase_order, name='generate_purchase_order'),
+    path('api/inventory/alerts/', views.inventory_api_alerts, name='inventory_api_alerts'),
+    path('api/book-velocity/<int:book_id>/', views.book_velocity_analysis, name='book_velocity_analysis'),
+    
+    # Advanced Search
+    path('search/advanced/', views.advanced_search, name='advanced_search'),
+    
+    # AI Recommendations
+    path('api/ai-recommendations/', views.get_ai_recommendations, name='ai_recommendations'),
+    
+    # AI Image Recognition URLs
+    path('ai-recognition/', views.ai_image_recognition_dashboard, name='ai_image_recognition_dashboard'),
+    path('ai-recognition/cover-analyzer/', views.book_cover_analyzer, name='book_cover_analyzer'),
+    path('ai-recognition/inventory-counter/', views.inventory_counter, name='inventory_counter'),
+    path('ai-recognition/damage-assessor/', views.damage_assessor, name='damage_assessor'),
+    path('ai-recognition/auto-categorizer/', views.auto_categorizer, name='auto_categorizer'),
+    path('ai-recognition/batch-categorize/', views.batch_categorize_books, name='batch_categorize_books'),
+    path('ai-recognition/analysis-report/', views.ai_analysis_report, name='ai_analysis_report'),
+    path('api/ai-analysis/<int:book_id>/', views.api_book_cover_analysis, name='api_book_cover_analysis'),
+    
+    # Smart Inventory URLs (keeping existing for reference)
 ]

@@ -1,0 +1,367 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %} AI Image Recognition Dashboard {% endblock title %}
+
+{% block extrastyle %}
+<!-- DataTables -->
+<link rel="stylesheet" href="{% static 'plugins/datatables-bs4/css/dataTables.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-responsive/css/responsive.bootstrap4.min.css' %}">
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.ai-feature-card {
+    transition: transform 0.2s;
+    border-left: 4px solid #007bff;
+}
+.ai-feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.damage-indicator {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+.damage-none { background-color: #d4edda; color: #155724; }
+.damage-minor { background-color: #fff3cd; color: #856404; }
+.damage-moderate { background-color: #f8d7da; color: #721c24; }
+.damage-severe { background-color: #f5c6cb; color: #721c24; }
+.confidence-bar {
+    height: 8px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.confidence-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+.confidence-high { background-color: #28a745; }
+.confidence-medium { background-color: #ffc107; }
+.confidence-low { background-color: #dc3545; }
+</style>
+{% endblock extrastyle %}
+
+{% block bodyclass %} hold-transition sidebar-mini layout-fixed {% endblock bodyclass %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">🤖 AI Image Recognition Dashboard</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="/">Home</a></li>
+                        <li class="breadcrumb-item active">AI Recognition</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            
+            <!-- Overview Cards -->
+            <div class="row">
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3>{{ total_analyzed }}</h3>
+                            <p>Books Analyzed</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3>{{ confidence_stats.high }}</h3>
+                            <p>High Confidence Results</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3>{{ confidence_stats.medium }}</h3>
+                            <p>Medium Confidence</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3>{{ confidence_stats.low }}</h3>
+                            <p>Low Confidence</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-times-circle"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Cards -->
+            <div class="row">
+                <div class="col-md-6 col-lg-3">
+                    <div class="card ai-feature-card">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-camera fa-3x text-primary"></i>
+                            </div>
+                            <h5 class="card-title">📖 Book Cover Analyzer</h5>
+                            <p class="card-text">Extract book information from cover images using AI</p>
+                            <a href="{% url 'book_cover_analyzer' %}" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Analyze Covers
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="card ai-feature-card">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-tags fa-3x text-success"></i>
+                            </div>
+                            <h5 class="card-title">🏷️ Auto Categorizer</h5>
+                            <p class="card-text">Automatically categorize books based on visual analysis</p>
+                            <a href="{% url 'auto_categorizer' %}" class="btn btn-success">
+                                <i class="fas fa-magic"></i> Auto Categorize
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="card ai-feature-card">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-shield-alt fa-3x text-warning"></i>
+                            </div>
+                            <h5 class="card-title">🔍 Damage Assessor</h5>
+                            <p class="card-text">Detect and assess book damage using computer vision</p>
+                            <a href="{% url 'damage_assessor' %}" class="btn btn-warning">
+                                <i class="fas fa-search-plus"></i> Check Damage
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="card ai-feature-card">
+                        <div class="card-body text-center">
+                            <div class="mb-3">
+                                <i class="fas fa-calculator fa-3x text-info"></i>
+                            </div>
+                            <h5 class="card-title">📊 Inventory Counter</h5>
+                            <p class="card-text">Count books in shelf images automatically</p>
+                            <a href="{% url 'inventory_counter' %}" class="btn btn-info">
+                                <i class="fas fa-count"></i> Count Books
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Analysis & Damage Statistics -->
+            <div class="row">
+                <!-- Recent Analyses -->
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">🔍 Recent AI Analyses</h3>
+                            <div class="card-tools">
+                                <a href="{% url 'ai_analysis_report' %}" class="btn btn-tool">
+                                    <i class="fas fa-chart-bar"></i> Full Report
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Book</th>
+                                            <th>AI Title</th>
+                                            <th>Category</th>
+                                            <th>Confidence</th>
+                                            <th>Damage</th>
+                                            <th>Analyzed</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for book in recent_analyses %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ book.bookname|truncatechars:30 }}</strong>
+                                                {% if book.cover_image %}
+                                                <br><small class="text-muted">
+                                                    <i class="fas fa-image"></i> Has cover
+                                                </small>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ book.ai_extracted_title|truncatechars:25|default:"—" }}</td>
+                                            <td>
+                                                <span class="badge badge-primary">
+                                                    {{ book.ai_suggested_category|default:"None" }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% if book.ai_confidence_score %}
+                                                <div class="confidence-bar">
+                                                    <div class="confidence-fill 
+                                                        {% if book.ai_confidence_score >= 0.8 %}confidence-high
+                                                        {% elif book.ai_confidence_score >= 0.5 %}confidence-medium
+                                                        {% else %}confidence-low{% endif %}"
+                                                        style="width: {{ book.ai_confidence_score|floatformat:0|default:0 }}%">
+                                                    </div>
+                                                </div>
+                                                <small>{{ book.ai_confidence_score|floatformat:2 }}</small>
+                                                {% else %}—{% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="damage-indicator damage-{{ book.damage_status }}">
+                                                    {{ book.get_damage_status_display }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <small>{{ book.last_ai_analysis|timesince }} ago</small>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center text-muted py-4">
+                                                <i class="fas fa-brain fa-2x mb-2"></i><br>
+                                                No AI analyses performed yet.<br>
+                                                <a href="{% url 'book_cover_analyzer' %}" class="btn btn-sm btn-primary mt-2">
+                                                    Start Analysis
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Damage Statistics -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">📊 Damage Statistics</h3>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="damageChart" width="300" height="300"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h3 class="card-title">⚡ Quick Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'book_cover_analyzer' %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-upload"></i> Upload Cover Image
+                                </a>
+                                <a href="{% url 'auto_categorizer' %}" class="btn btn-outline-success btn-sm">
+                                    <i class="fas fa-magic"></i> Batch Categorize
+                                </a>
+                                <a href="{% url 'damage_assessor' %}" class="btn btn-outline-warning btn-sm">
+                                    <i class="fas fa-search"></i> Check Book Damage
+                                </a>
+                                <a href="{% url 'ai_analysis_report' %}" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-chart-line"></i> Analysis Report
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<script>
+// Damage Statistics Chart
+const damageData = {
+    labels: [
+        {% for stat in damage_stats %}
+        '{{ stat.damage_status|capfirst }}'{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ],
+    datasets: [{
+        data: [
+            {% for stat in damage_stats %}
+            {{ stat.count }}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        backgroundColor: [
+            '#28a745', // None - Green
+            '#ffc107', // Minor - Yellow
+            '#fd7e14', // Moderate - Orange
+            '#dc3545'  // Severe - Red
+        ],
+        borderWidth: 2,
+        borderColor: '#fff'
+    }]
+};
+
+const damageConfig = {
+    type: 'doughnut',
+    data: damageData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = ((context.raw / total) * 100).toFixed(1);
+                        return context.label + ': ' + context.raw + ' (' + percentage + '%)';
+                    }
+                }
+            }
+        }
+    }
+};
+
+new Chart(document.getElementById('damageChart'), damageConfig);
+
+// Auto-refresh every 5 minutes
+setTimeout(function() {
+    location.reload();
+}, 300000);
+</script>
+{% endblock extra_scripts %}

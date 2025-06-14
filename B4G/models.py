@@ -72,9 +72,7 @@ class Authors(models.Model):
         verbose_name_plural = _("Authors")
 
 
-class Books(models.Model):
-
-    #__Books_FIELDS__
+class Books(models.Model):    #__Books_FIELDS__
     id_pub = models.ForeignKey(Publishers, on_delete=models.CASCADE)
     bookname = models.TextField(max_length=255, null=True, blank=True)
     publishdate = models.DateTimeField(blank=True, null=True, default=timezone.now)
@@ -83,6 +81,28 @@ class Books(models.Model):
     lastmodified = models.DateTimeField(blank=True, null=True, default=timezone.now)
     barcode = models.ImageField(upload_to='barcodes/', null=True, blank=True)
     barcode_number = models.CharField(max_length=13, null=True, blank=True)
+    
+    # AI Image Recognition Fields
+    cover_image = models.ImageField(upload_to='book_covers/', null=True, blank=True, 
+                                  help_text="Book cover image for AI analysis")
+    ai_extracted_title = models.TextField(max_length=500, null=True, blank=True,
+                                        help_text="Title extracted by AI from cover")
+    ai_extracted_authors = models.TextField(max_length=500, null=True, blank=True,
+                                          help_text="Authors extracted by AI (JSON format)")
+    ai_suggested_category = models.CharField(max_length=100, null=True, blank=True,
+                                           help_text="Category suggested by AI analysis")
+    ai_confidence_score = models.FloatField(null=True, blank=True,
+                                          help_text="AI analysis confidence (0.0-1.0)")
+    damage_status = models.CharField(max_length=20, choices=[
+        ('none', 'No Damage'),
+        ('minor', 'Minor Wear'),
+        ('moderate', 'Moderate Damage'),
+        ('severe', 'Severe Damage')
+    ], default='none', help_text="Book damage assessment")
+    damage_details = models.TextField(null=True, blank=True,
+                                    help_text="Detailed damage assessment (JSON format)")
+    last_ai_analysis = models.DateTimeField(null=True, blank=True,
+                                          help_text="When AI analysis was last performed")
 
     #__Books_FIELDS__END
 

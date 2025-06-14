@@ -161,3 +161,17 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# AI Image Recognition Settings
+# Google Gemini API Configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')  # Set your Gemini API key in .env file
+
+# AI Image Recognition Settings
+AI_IMAGE_RECOGNITION = {
+    'UPLOAD_PATH': 'ai_recognition/uploads/',
+    'MAX_FILE_SIZE': 10 * 1024 * 1024,  # 10MB
+    'ALLOWED_EXTENSIONS': ['.jpg', '.jpeg', '.png', '.bmp'],
+    'OCR_LANGUAGES': ['en'],
+    'CONFIDENCE_THRESHOLD': 0.5,
+    'BATCH_SIZE': 50,
+}

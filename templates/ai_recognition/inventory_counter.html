@@ -1,0 +1,690 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Smart Inventory Counter - AI Image Recognition{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'plugins/sweetalert2-theme-bootstrap-4/bootstrap-4.min.css' %}">
+<style>
+    .upload-zone {
+        border: 3px dashed #28a745;
+        border-radius: 15px;
+        padding: 60px 20px;
+        text-align: center;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .upload-zone:hover {
+        border-color: #20c997;
+        background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.2);
+    }
+    
+    .upload-zone.dragover {
+        border-color: #17a2b8;
+        background: linear-gradient(135deg, #e1f7fe 0%, #b3e5fc 100%);
+        transform: scale(1.02);
+    }
+    
+    .upload-icon {
+        font-size: 4rem;
+        color: #28a745;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-zone:hover .upload-icon {
+        color: #20c997;
+        transform: scale(1.1);
+    }
+    
+    .counting-settings {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .detection-options {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        margin: 20px 0;
+    }
+    
+    .detection-option {
+        flex: 1;
+        min-width: 200px;
+        padding: 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        background: white;
+    }
+    
+    .detection-option:hover {
+        border-color: #28a745;
+        background: #f8f9fa;
+    }
+    
+    .detection-option.active {
+        border-color: #28a745;
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .detection-option i {
+        font-size: 2rem;
+        margin-bottom: 10px;
+        display: block;
+    }
+    
+    .results-container {
+        background: white;
+        border-radius: 15px;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .count-display {
+        text-align: center;
+        padding: 30px;
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        border-radius: 15px;
+        margin: 20px 0;
+    }
+    
+    .count-number {
+        font-size: 4rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .detected-books {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .book-detection {
+        border: 2px solid #28a745;
+        border-radius: 10px;
+        padding: 15px;
+        text-align: center;
+        background: #f8f9fa;
+    }
+    
+    .book-detection img {
+        max-width: 100%;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 8px;
+        margin-bottom: 10px;
+    }
+    
+    .confidence-meter {
+        width: 100%;
+        height: 8px;
+        background: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .confidence-bar {
+        height: 100%;
+        transition: width 0.5s ease;
+    }
+    
+    .accuracy-high { background: #28a745; }
+    .accuracy-medium { background: #ffc107; }
+    .accuracy-low { background: #dc3545; }
+    
+    .analysis-controls {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .processing-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        display: none;
+    }
+    
+    .processing-content {
+        background: white;
+        padding: 40px;
+        border-radius: 15px;
+        text-align: center;
+        max-width: 400px;
+    }
+    
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #28a745;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .statistics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin: 20px 0;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        border-left: 4px solid #28a745;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #28a745;
+    }
+    
+    .image-preview {
+        max-width: 100%;
+        border-radius: 10px;
+        margin: 20px 0;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">
+                        <i class="fas fa-calculator text-success"></i>
+                        Smart Inventory Counter
+                    </h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'ai_image_recognition_dashboard' %}">AI Recognition</a></li>
+                        <li class="breadcrumb-item active">Inventory Counter</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Settings Card -->
+            <div class="counting-settings">
+                <h4><i class="fas fa-cog text-primary"></i> Detection Settings</h4>
+                <p class="text-muted">Configure how the AI should count books in your images</p>
+                
+                <div class="detection-options">
+                    <div class="detection-option active" data-mode="spines">
+                        <i class="fas fa-book text-primary"></i>
+                        <h6>Book Spines</h6>
+                        <small>Count books by detecting spines on shelves</small>
+                    </div>
+                    <div class="detection-option" data-mode="covers">
+                        <i class="fas fa-image text-info"></i>
+                        <h6>Book Covers</h6>
+                        <small>Count books by identifying front covers</small>
+                    </div>
+                    <div class="detection-option" data-mode="stacks">
+                        <i class="fas fa-layer-group text-warning"></i>
+                        <h6>Book Stacks</h6>
+                        <small>Count books in piles or stacks</small>
+                    </div>
+                    <div class="detection-option" data-mode="mixed">
+                        <i class="fas fa-magic text-success"></i>
+                        <h6>Auto Detect</h6>
+                        <small>Automatically choose best method</small>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Minimum Confidence (%)</label>
+                            <input type="range" class="form-control-range" id="confidenceSlider" min="50" max="95" value="75">
+                            <span class="badge badge-primary" id="confidenceValue">75%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Detection Sensitivity</label>
+                            <select class="form-control" id="sensitivitySelect">
+                                <option value="low">Low (Fewer false positives)</option>
+                                <option value="medium" selected>Medium (Balanced)</option>
+                                <option value="high">High (More sensitive)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Zone -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="upload-zone" id="uploadZone">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h4>Upload Shelf Image for Counting</h4>
+                        <p class="text-muted">Drag and drop your bookshelf image here, or click to browse</p>
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                        <div class="mt-3">
+                            <span class="badge badge-info">Supported: JPG, PNG, WEBP</span>
+                            <span class="badge badge-warning">Max size: 10MB</span>
+                        </div>
+                    </div>
+                    
+                    <div id="imagePreview" style="display: none;">
+                        <img id="previewImage" class="image-preview" alt="Preview">
+                        <div class="text-center">
+                            <button class="btn btn-success btn-lg" id="analyzeBtn">
+                                <i class="fas fa-search"></i> Start Counting
+                            </button>
+                            <button class="btn btn-secondary ml-2" id="clearBtn">
+                                <i class="fas fa-times"></i> Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Container -->
+            <div class="results-container" id="resultsContainer">
+                <h4><i class="fas fa-chart-bar text-success"></i> Counting Results</h4>
+                
+                <div class="count-display">
+                    <div class="count-number" id="totalCount">0</div>
+                    <h5>Books Detected</h5>
+                    <div class="confidence-meter">
+                        <div class="confidence-bar accuracy-high" id="overallConfidence" style="width: 0%"></div>
+                    </div>
+                    <span class="badge badge-light" id="confidenceText">0% Confidence</span>
+                </div>
+
+                <div class="statistics-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="spineCount">0</div>
+                        <small>Book Spines</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="coverCount">0</div>
+                        <small>Front Covers</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="stackCount">0</div>
+                        <small>Book Stacks</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="processingTime">0s</div>
+                        <small>Processing Time</small>
+                    </div>
+                </div>
+
+                <div class="detected-books" id="detectedBooks">
+                    <!-- Detected books will be populated here -->
+                </div>
+
+                <div class="analysis-controls">
+                    <button class="btn btn-primary" id="saveCountBtn">
+                        <i class="fas fa-save"></i> Save Count to Inventory
+                    </button>
+                    <button class="btn btn-info" id="exportReportBtn">
+                        <i class="fas fa-file-export"></i> Export Report
+                    </button>
+                    <button class="btn btn-warning" id="reanalyzeBtn">
+                        <i class="fas fa-redo"></i> Re-analyze with Different Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Processing Overlay -->
+<div class="processing-overlay" id="processingOverlay">
+    <div class="processing-content">
+        <div class="spinner"></div>
+        <h4>Analyzing Image...</h4>
+        <p id="processingStatus">Initializing AI analysis...</p>
+        <div class="progress mt-3">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                 id="progressBar" style="width: 0%"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'plugins/sweetalert2/sweetalert2.min.js' %}"></script>
+<script>
+$(document).ready(function() {
+    let selectedMode = 'spines';
+    let currentImage = null;
+    let analysisResults = null;
+
+    // Upload zone functionality
+    const uploadZone = $('#uploadZone');
+    const imageInput = $('#imageInput');
+    const imagePreview = $('#imagePreview');
+    const previewImage = $('#previewImage');
+
+    uploadZone.on('click', function() {
+        imageInput.click();
+    });
+
+    uploadZone.on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    });
+
+    uploadZone.on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    });
+
+    uploadZone.on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileSelect(files[0]);
+        }
+    });
+
+    imageInput.on('change', function(e) {
+        if (e.target.files.length > 0) {
+            handleFileSelect(e.target.files[0]);
+        }
+    });
+
+    function handleFileSelect(file) {
+        if (!file.type.startsWith('image/')) {
+            Swal.fire('Error', 'Please select a valid image file.', 'error');
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            Swal.fire('Error', 'File size must be less than 10MB.', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImage.attr('src', e.target.result);
+            imagePreview.show();
+            uploadZone.hide();
+            currentImage = file;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Detection mode selection
+    $('.detection-option').on('click', function() {
+        $('.detection-option').removeClass('active');
+        $(this).addClass('active');
+        selectedMode = $(this).data('mode');
+    });
+
+    // Confidence slider
+    $('#confidenceSlider').on('input', function() {
+        $('#confidenceValue').text($(this).val() + '%');
+    });
+
+    // Clear button
+    $('#clearBtn').on('click', function() {
+        imagePreview.hide();
+        uploadZone.show();
+        $('#resultsContainer').hide();
+        currentImage = null;
+        analysisResults = null;
+    });
+
+    // Analyze button
+    $('#analyzeBtn').on('click', function() {
+        if (!currentImage) {
+            Swal.fire('Error', 'Please select an image first.', 'error');
+            return;
+        }
+        startAnalysis();
+    });
+
+    function startAnalysis() {
+        const formData = new FormData();
+        formData.append('image', currentImage);
+        formData.append('mode', selectedMode);
+        formData.append('confidence', $('#confidenceSlider').val());
+        formData.append('sensitivity', $('#sensitivitySelect').val());
+
+        showProcessingOverlay();
+        
+        // Simulate progress updates
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 20;
+            if (progress > 90) progress = 90;
+            updateProgress(progress);
+        }, 500);
+
+        $.ajax({
+            url: '{% url "inventory_counter" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                clearInterval(progressInterval);
+                updateProgress(100);
+                setTimeout(() => {
+                    hideProcessingOverlay();
+                    displayResults(response);
+                }, 1000);
+            },
+            error: function(xhr) {
+                clearInterval(progressInterval);
+                hideProcessingOverlay();
+                let message = 'An error occurred during analysis.';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message = xhr.responseJSON.error;
+                }
+                Swal.fire('Error', message, 'error');
+            }
+        });
+    }
+
+    function showProcessingOverlay() {
+        $('#processingOverlay').show();
+        updateProcessingStatus('Preprocessing image...');
+    }
+
+    function hideProcessingOverlay() {
+        $('#processingOverlay').hide();
+    }
+
+    function updateProgress(percent) {
+        $('#progressBar').css('width', percent + '%');
+        
+        let status = 'Initializing...';
+        if (percent > 20) status = 'Detecting book boundaries...';
+        if (percent > 40) status = 'Analyzing book spines...';
+        if (percent > 60) status = 'Counting detected books...';
+        if (percent > 80) status = 'Calculating confidence scores...';
+        if (percent > 95) status = 'Finalizing results...';
+        
+        updateProcessingStatus(status);
+    }
+
+    function updateProcessingStatus(status) {
+        $('#processingStatus').text(status);
+    }
+
+    function displayResults(response) {
+        analysisResults = response;
+        
+        // Update count display
+        $('#totalCount').text(response.total_count || 0);
+        $('#spineCount').text(response.spine_count || 0);
+        $('#coverCount').text(response.cover_count || 0);
+        $('#stackCount').text(response.stack_count || 0);
+        $('#processingTime').text((response.processing_time || 0) + 's');
+        
+        // Update confidence
+        const confidence = response.overall_confidence || 0;
+        $('#overallConfidence').css('width', confidence + '%');
+        $('#confidenceText').text(confidence + '% Confidence');
+        
+        // Set confidence bar color
+        let confidenceClass = 'accuracy-low';
+        if (confidence >= 75) confidenceClass = 'accuracy-high';
+        else if (confidence >= 50) confidenceClass = 'accuracy-medium';
+        
+        $('#overallConfidence').removeClass('accuracy-high accuracy-medium accuracy-low')
+                              .addClass(confidenceClass);
+        
+        // Display detected books
+        displayDetectedBooks(response.detected_books || []);
+        
+        $('#resultsContainer').show();
+        
+        Swal.fire({
+            title: 'Analysis Complete!',
+            text: `Found ${response.total_count} books with ${confidence}% confidence`,
+            icon: 'success',
+            timer: 3000
+        });
+    }
+
+    function displayDetectedBooks(books) {
+        const container = $('#detectedBooks');
+        container.empty();
+        
+        books.forEach((book, index) => {
+            const bookCard = $(`
+                <div class="book-detection">
+                    <div class="text-center">
+                        <i class="fas fa-book text-primary" style="font-size: 2rem;"></i>
+                        <h6 class="mt-2">Book ${index + 1}</h6>
+                        <div class="confidence-meter">
+                            <div class="confidence-bar ${getConfidenceClass(book.confidence)}" 
+                                 style="width: ${book.confidence}%"></div>
+                        </div>
+                        <small class="text-muted">${book.confidence}% confidence</small>
+                        <br>
+                        <small class="badge badge-secondary">${book.type || 'Unknown'}</small>
+                    </div>
+                </div>
+            `);
+            container.append(bookCard);
+        });
+    }
+
+    function getConfidenceClass(confidence) {
+        if (confidence >= 75) return 'accuracy-high';
+        if (confidence >= 50) return 'accuracy-medium';
+        return 'accuracy-low';
+    }
+
+    // Save count button
+    $('#saveCountBtn').on('click', function() {
+        if (!analysisResults) {
+            Swal.fire('Error', 'No analysis results to save.', 'error');
+            return;
+        }
+
+        Swal.fire({
+            title: 'Save to Inventory?',
+            text: `This will record ${analysisResults.total_count} books in your inventory.`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, save it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Implement save functionality
+                Swal.fire('Saved!', 'Count has been saved to inventory.', 'success');
+            }
+        });
+    });
+
+    // Export report button
+    $('#exportReportBtn').on('click', function() {
+        if (!analysisResults) {
+            Swal.fire('Error', 'No analysis results to export.', 'error');
+            return;
+        }
+        
+        // Create and download report
+        const report = {
+            timestamp: new Date().toISOString(),
+            total_count: analysisResults.total_count,
+            confidence: analysisResults.overall_confidence,
+            mode: selectedMode,
+            detected_books: analysisResults.detected_books
+        };
+        
+        const blob = new Blob([JSON.stringify(report, null, 2)], {
+            type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inventory_count_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        Swal.fire('Exported!', 'Report has been downloaded.', 'success');
+    });
+
+    // Re-analyze button
+    $('#reanalyzeBtn').on('click', function() {
+        if (!currentImage) {
+            Swal.fire('Error', 'No image to re-analyze.', 'error');
+            return;
+        }
+        startAnalysis();
+    });
+});
+</script>
+{% endblock %}

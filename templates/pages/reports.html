@@ -1,0 +1,372 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Reports & Analytics - Books4Geeks{% endblock title %}
+
+{% block extrastyle %}
+<!-- Chart.js -->
+<link rel="stylesheet" href="{% static 'plugins/chart.js/Chart.min.css' %}">
+<!-- DataTables -->
+<link rel="stylesheet" href="{% static 'plugins/datatables-bs4/css/dataTables.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-responsive/css/responsive.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-buttons/css/buttons.bootstrap4.min.css' %}">
+{% endblock extrastyle %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <div class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1 class="m-0">Reports & Analytics</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+            <li class="breadcrumb-item active">Reports</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      
+      <!-- Summary Cards -->
+      <div class="row">
+        <div class="col-lg-3 col-6">
+          <div class="small-box bg-info">
+            <div class="inner">
+              <h3>${{ total_revenue|floatformat:0 }}</h3>
+              <p>Total Revenue</p>
+            </div>
+            <div class="icon">
+              <i class="ion ion-bag"></i>
+            </div>
+            <div class="small-box-footer">
+              <span class="text-sm">This Month: ${{ monthly_revenue|floatformat:0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+          <div class="small-box bg-success">
+            <div class="inner">
+              <h3>{{ total_bills }}</h3>
+              <p>Total Bills</p>
+            </div>
+            <div class="icon">
+              <i class="ion ion-stats-bars"></i>
+            </div>
+            <div class="small-box-footer">
+              <span class="text-sm">This Month: {{ monthly_bills }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+          <div class="small-box bg-warning">
+            <div class="inner">
+              <h3>{{ total_imports }}</h3>
+              <p>Total Imports</p>
+            </div>
+            <div class="icon">
+              <i class="ion ion-person-add"></i>
+            </div>
+            <div class="small-box-footer">
+              <span class="text-sm">Import Value: ${{ total_import_value|floatformat:0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-6">
+          <div class="small-box bg-danger">
+            <div class="inner">
+              <h3>{{ avg_bill_amount|floatformat:0 }}</h3>
+              <p>Avg. Bill Amount</p>
+            </div>
+            <div class="icon">
+              <i class="ion ion-pie-graph"></i>
+            </div>
+            <div class="small-box-footer">
+              <span class="text-sm">Per Transaction</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="row">
+        <!-- Revenue Chart -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-chart-line mr-1"></i>
+                Monthly Revenue Trend
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                  <i class="fas fa-minus"></i>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <canvas id="revenueChart" height="300"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sales by Category -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-chart-pie mr-1"></i>
+                Sales by Category
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                  <i class="fas fa-minus"></i>
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <canvas id="categoryChart" height="300"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tables Row -->
+      <div class="row">
+        <!-- Top Selling Books -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-trophy mr-1"></i>
+                Top Selling Books
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" onclick="exportTopBooks()">
+                  <i class="fas fa-download"></i> Export CSV
+                </button>
+              </div>
+            </div>
+            <div class="card-body table-responsive p-0">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th style="width: 10px">#</th>
+                    <th>Book Name</th>
+                    <th>Sold</th>
+                    <th>Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for book in top_books %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ book.id_book__bookname|truncatewords:4 }}</td>
+                    <td><span class="badge bg-success">{{ book.total_sold }}</span></td>
+                    <td>${{ book.total_revenue|floatformat:2 }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center">No sales data available</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Customers -->
+        <div class="col-md-6">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-users mr-1"></i>
+                Top Customers
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" onclick="exportTopCustomers()">
+                  <i class="fas fa-download"></i> Export CSV
+                </button>
+              </div>
+            </div>
+            <div class="card-body table-responsive p-0">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th style="width: 10px">#</th>
+                    <th>Customer</th>
+                    <th>Bills</th>
+                    <th>Total Spent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for customer in top_customers %}
+                  <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ customer.id_cus__cusname }}</td>
+                    <td><span class="badge bg-primary">{{ customer.bill_count }}</span></td>
+                    <td>${{ customer.total_spent|floatformat:2 }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="4" class="text-center">No customer data available</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Filters -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-filter mr-1"></i>
+                Generate Custom Report
+              </h3>
+            </div>
+            <div class="card-body">
+              <form method="POST" action="{% url 'reports' %}">
+                {% csrf_token %}
+                <div class="row">
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label>Start Date</label>
+                      <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label>End Date</label>
+                      <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label>Report Type</label>
+                      <select class="form-control" name="report_type">
+                        <option value="sales">Sales Report</option>
+                        <option value="inventory">Inventory Report</option>
+                        <option value="customer">Customer Report</option>
+                        <option value="import">Import Report</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-group">
+                      <label>&nbsp;</label>
+                      <div>
+                        <button type="submit" class="btn btn-primary">
+                          <i class="fas fa-chart-bar"></i> Generate Report
+                        </button>
+                        <button type="button" class="btn btn-success" onclick="exportToPDF()">
+                          <i class="fas fa-file-pdf"></i> Export PDF
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<!-- Chart.js -->
+<script src="{% static 'plugins/chart.js/Chart.min.js' %}"></script>
+<!-- DataTables -->
+<script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/jszip/jszip.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.html5.min.js' %}"></script>
+
+<script>
+$(function () {
+  // Revenue Chart
+  var ctx1 = document.getElementById('revenueChart').getContext('2d');
+  var revenueChart = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: {{ month_labels|safe }},
+      datasets: [{
+        label: 'Revenue ($)',
+        data: {{ revenue_data|safe }},
+        borderColor: 'rgb(75, 192, 192)',
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        tension: 0.1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+
+  // Category Chart
+  var ctx2 = document.getElementById('categoryChart').getContext('2d');
+  var categoryChart = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: {{ category_labels|safe }},
+      datasets: [{
+        data: {{ category_data|safe }},
+        backgroundColor: [
+          '#FF6384',
+          '#36A2EB',
+          '#FFCE56',
+          '#4BC0C0',
+          '#9966FF',
+          '#FF9F40'
+        ]
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+});
+
+// Export functions
+function exportTopBooks() {
+  window.location.href = '{% url "reports" %}?export=top_books&format=csv';
+}
+
+function exportTopCustomers() {
+  window.location.href = '{% url "reports" %}?export=top_customers&format=csv';
+}
+
+function exportToPDF() {
+  window.location.href = '{% url "reports" %}?export=full_report&format=pdf';
+}
+</script>
+{% endblock extra_scripts %}

@@ -1,0 +1,482 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Advanced Search - Books4Geeks{% endblock title %}
+
+{% block extrastyle %}
+<!-- Select2 -->
+<link rel="stylesheet" href="{% static 'plugins/select2/css/select2.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
+<!-- DataTables -->
+<link rel="stylesheet" href="{% static 'plugins/datatables-bs4/css/dataTables.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-responsive/css/responsive.bootstrap4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/datatables-buttons/css/buttons.bootstrap4.min.css' %}">
+<!-- Custom Search Styles -->
+<style>
+.search-card {
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
+  transition: all 0.3s ease;
+}
+.search-card:hover {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  transform: translateY(-1px);
+}
+.search-result-item {
+  border-bottom: 1px solid #e9ecef;
+  padding: 1rem;
+  transition: background-color 0.2s ease;
+}
+.search-result-item:hover {
+  background-color: #f8f9fa;
+}
+.search-stats {
+  background: linear-gradient(45deg, #007bff, #6f42c1);
+  color: white;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.filter-chip {
+  display: inline-block;
+  background-color: #e9ecef;
+  color: #495057;
+  padding: 0.25rem 0.5rem;
+  margin: 0.125rem;
+  border-radius: 1rem;
+  font-size: 0.875rem;
+}
+.filter-chip.active {
+  background-color: #007bff;
+  color: white;
+}
+</style>
+{% endblock extrastyle %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <div class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1 class="m-0">Advanced Search</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+            <li class="breadcrumb-item active">Advanced Search</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      
+      <!-- Search Form -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card search-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-search mr-2"></i>Search Parameters
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" onclick="clearSearch()">
+                  <i class="fas fa-times"></i> Clear
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <form method="GET" action="{% url 'advanced_search' %}" id="searchForm">
+                <div class="row">
+                  <!-- General Search -->
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label><i class="fas fa-search text-primary"></i> Search Term</label>
+                      <input type="text" class="form-control" name="q" value="{{ request.GET.q }}" 
+                             placeholder="Search books, authors, categories..." autocomplete="off">
+                    </div>
+                  </div>
+                  
+                  <!-- Search Type -->
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label><i class="fas fa-filter text-primary"></i> Search In</label>
+                      <select class="form-control select2" name="search_type">
+                        <option value="all" {% if request.GET.search_type == 'all' %}selected{% endif %}>All Fields</option>
+                        <option value="books" {% if request.GET.search_type == 'books' %}selected{% endif %}>Books Only</option>
+                        <option value="authors" {% if request.GET.search_type == 'authors' %}selected{% endif %}>Authors Only</option>
+                        <option value="categories" {% if request.GET.search_type == 'categories' %}selected{% endif %}>Categories Only</option>
+                        <option value="publishers" {% if request.GET.search_type == 'publishers' %}selected{% endif %}>Publishers Only</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <!-- Category Filter -->
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label><i class="fas fa-tags text-success"></i> Category</label>
+                      <select class="form-control select2" name="category" data-placeholder="Select category...">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                          {{ category.catname }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Author Filter -->
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label><i class="fas fa-user text-info"></i> Author</label>
+                      <select class="form-control select2" name="author" data-placeholder="Select author...">
+                        <option value="">All Authors</option>
+                        {% for author in authors %}
+                        <option value="{{ author.id }}" {% if request.GET.author == author.id|stringformat:"s" %}selected{% endif %}>
+                          {{ author.authorname }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Publisher Filter -->
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label><i class="fas fa-building text-warning"></i> Publisher</label>
+                      <select class="form-control select2" name="publisher" data-placeholder="Select publisher...">
+                        <option value="">All Publishers</option>
+                        {% for publisher in publishers %}
+                        <option value="{{ publisher.id }}" {% if request.GET.publisher == publisher.id|stringformat:"s" %}selected{% endif %}>
+                          {{ publisher.pubname }}
+                        </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <!-- Price Range -->
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label><i class="fas fa-dollar-sign text-success"></i> Price Range</label>
+                      <div class="row">
+                        <div class="col-6">
+                          <input type="number" class="form-control" name="price_min" value="{{ request.GET.price_min }}" 
+                                 placeholder="Min Price" step="0.01">
+                        </div>
+                        <div class="col-6">
+                          <input type="number" class="form-control" name="price_max" value="{{ request.GET.price_max }}" 
+                                 placeholder="Max Price" step="0.01">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Date Range -->
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label><i class="fas fa-calendar text-primary"></i> Publish Date Range</label>
+                      <div class="row">
+                        <div class="col-6">
+                          <input type="date" class="form-control" name="date_from" value="{{ request.GET.date_from }}">
+                        </div>
+                        <div class="col-6">
+                          <input type="date" class="form-control" name="date_to" value="{{ request.GET.date_to }}">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-12">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                      <i class="fas fa-search"></i> Search
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-lg ml-2" onclick="clearSearch()">
+                      <i class="fas fa-times"></i> Clear
+                    </button>
+                    <button type="button" class="btn btn-info btn-lg ml-2" onclick="saveSearch()">
+                      <i class="fas fa-bookmark"></i> Save Search
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if results %}
+      <!-- Search Statistics -->
+      <div class="row">
+        <div class="col-12">
+          <div class="search-stats">
+            <div class="row text-center">
+              <div class="col-md-3">
+                <h3>{{ total_results }}</h3>
+                <p>Total Results</p>
+              </div>
+              <div class="col-md-3">
+                <h3>{{ books_count }}</h3>
+                <p>Books Found</p>
+              </div>
+              <div class="col-md-3">
+                <h3>{{ authors_count }}</h3>
+                <p>Authors Found</p>
+              </div>
+              <div class="col-md-3">
+                <h3>{{ categories_count }}</h3>
+                <p>Categories Found</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search Results -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-list mr-2"></i>Search Results
+              </h3>
+              <div class="card-tools">
+                <div class="btn-group">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="exportResults('csv')">
+                    <i class="fas fa-download"></i> CSV
+                  </button>
+                  <button type="button" class="btn btn-sm btn-success" onclick="exportResults('excel')">
+                    <i class="fas fa-file-excel"></i> Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <!-- Filter Chips -->
+              {% if active_filters %}
+              <div class="mb-3">
+                <span class="text-muted">Active Filters: </span>
+                {% for filter in active_filters %}
+                <span class="filter-chip active">{{ filter }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+
+              <!-- Results Table -->
+              <div class="table-responsive">
+                <table id="searchResultsTable" class="table table-bordered table-striped">
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Name/Title</th>
+                      <th>Details</th>
+                      <th>Price</th>
+                      <th>Stock</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for result in results %}
+                    <tr>
+                      <td>
+                        {% if result.type == 'book' %}
+                          <span class="badge badge-primary">Book</span>
+                        {% elif result.type == 'author' %}
+                          <span class="badge badge-info">Author</span>
+                        {% elif result.type == 'category' %}
+                          <span class="badge badge-success">Category</span>
+                        {% elif result.type == 'publisher' %}
+                          <span class="badge badge-warning">Publisher</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <strong>{{ result.name }}</strong>
+                        {% if result.description %}
+                        <br><small class="text-muted">{{ result.description|truncatewords:10 }}</small>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if result.type == 'book' %}
+                          <small>
+                            {% if result.author %}Author: {{ result.author }}<br>{% endif %}
+                            {% if result.publisher %}Publisher: {{ result.publisher }}<br>{% endif %}
+                            {% if result.category %}Category: {{ result.category }}{% endif %}
+                          </small>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if result.price %}
+                          ${{ result.price|floatformat:2 }}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if result.stock %}
+                          {% if result.stock|add:0 < 10 %}
+                            <span class="badge badge-danger">{{ result.stock }}</span>
+                          {% else %}
+                            <span class="badge badge-success">{{ result.stock }}</span>
+                          {% endif %}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <div class="btn-group btn-group-sm">
+                          <a href="#" class="btn btn-primary">
+                            <i class="fas fa-eye"></i>
+                          </a>
+                          {% if result.type == 'book' %}
+                          <a href="#" class="btn btn-success">
+                            <i class="fas fa-edit"></i>
+                          </a>
+                          <a href="#" class="btn btn-warning">
+                            <i class="fas fa-shopping-cart"></i>
+                          </a>
+                          {% endif %}
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Quick Search Cards -->
+      {% if not results %}
+      <div class="row">
+        <div class="col-12">
+          <h4 class="mb-3">Quick Search Categories</h4>
+        </div>
+        {% for category in popular_categories %}
+        <div class="col-md-4 col-sm-6 mb-3">
+          <div class="card search-card h-100">
+            <div class="card-body text-center">
+              <i class="fas fa-tag fa-3x text-primary mb-3"></i>
+              <h5 class="card-title">{{ category.catname }}</h5>
+              <p class="card-text">{{ category.description|truncatewords:8 }}</p>
+              <a href="?category={{ category.id }}&search_type=books" class="btn btn-primary">
+                <i class="fas fa-search"></i> Search Books
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+  </section>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<!-- Select2 -->
+<script src="{% static 'plugins/select2/js/select2.full.min.js' %}"></script>
+<!-- DataTables -->
+<script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/dataTables.responsive.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-responsive/js/responsive.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/dataTables.buttons.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.bootstrap4.min.js' %}"></script>
+<script src="{% static 'plugins/jszip/jszip.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-buttons/js/buttons.html5.min.js' %}"></script>
+
+<script>
+$(function () {
+  // Initialize Select2
+  $('.select2').select2({
+    theme: 'bootstrap4',
+    allowClear: true
+  });
+
+  // Initialize DataTable
+  {% if results %}
+  $('#searchResultsTable').DataTable({
+    "responsive": true,
+    "lengthChange": false,
+    "autoWidth": false,
+    "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"],
+    "pageLength": 25,
+    "order": [[1, "asc"]]
+  }).buttons().container().appendTo('#searchResultsTable_wrapper .col-md-6:eq(0)');
+  {% endif %}
+
+  // Auto-suggest functionality
+  $('input[name="q"]').on('input', function() {
+    var query = $(this).val();
+    if (query.length > 2) {
+      // You can add AJAX auto-suggest here
+      console.log('Searching for: ' + query);
+    }
+  });
+});
+
+function clearSearch() {
+  $('#searchForm')[0].reset();
+  $('.select2').val(null).trigger('change');
+  window.location.href = '{% url "advanced_search" %}';
+}
+
+function saveSearch() {
+  var searchParams = $('#searchForm').serialize();
+  localStorage.setItem('savedSearch', searchParams);
+  alert('Search saved successfully!');
+}
+
+function loadSavedSearch() {
+  var savedSearch = localStorage.getItem('savedSearch');
+  if (savedSearch) {
+    window.location.href = '{% url "advanced_search" %}?' + savedSearch;
+  }
+}
+
+function exportResults(format) {
+  var searchParams = $('#searchForm').serialize();
+  window.location.href = '{% url "advanced_search" %}?' + searchParams + '&export=' + format;
+}
+
+// AI Recommendations - Show recommendation button if books found
+{% if books_results %}
+function showAIRecommendations() {
+  var bookId = {{ books_results.0.id }};
+  var interests = $('input[name="q"]').val() || '';
+  
+  if (confirm('Get AI-powered book recommendations based on your search results?')) {
+    // Simple implementation - open in new tab for now
+    var url = '/api/ai-recommendations/?book_id=' + bookId + '&interests=' + encodeURIComponent(interests) + '&type=similar';
+    window.open(url, '_blank');
+  }
+}
+
+// Add recommendation button after search if books found
+$(document).ready(function() {
+  if ($('#searchResultsTable tbody tr').length > 0) {
+    var recommendBtn = '<button type="button" class="btn btn-info ml-2" onclick="showAIRecommendations()">' +
+                      '<i class="fas fa-robot"></i> Get AI Recommendations</button>';
+    $('.card-tools .btn-group').after(recommendBtn);
+  }
+});
+{% endif %}
+</script>
+{% endblock extra_scripts %}

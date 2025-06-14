@@ -5,7 +5,8 @@ from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
+from datetime import datetime, timedelta
 from .models import *
 import barcode
 from barcode.writer import ImageWriter
@@ -30,6 +31,12 @@ from datetime import datetime
 from django.utils import timezone as django_timezone
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from .smart_inventory import SmartInventoryManager, get_smart_inventory_alerts, get_book_restock_recommendation, get_inventory_dashboard_data
+from .ai_image_recognition import process_book_cover_image, count_books_in_shelf, assess_book_damage, image_recognition
+from django.views.decorators.http import require_http_methods
+from django.core.files.storage import default_storage
+import tempfile
+import uuid
 
 # Create your views here.
 
@@ -138,11 +145,102 @@ def user_logout_view(request):
 
 # pages
 def index(request):
-  context = {
-    'parent': 'dashboard',
-    'segment': 'dashboardv1'
-  }
-  return render(request, 'pages/index.html', context)
+    from django.db.models import Sum, Count, Avg
+    from decimal import Decimal
+    from datetime import datetime, timedelta
+    
+    # Get current date and calculate date ranges
+    today = timezone.now().date()
+    thirty_days_ago = today - timedelta(days=30)
+    
+    # Calculate key statistics
+    # 1. Total Books in System
+    total_books = Books.objects.count()
+    
+    # 2. Total Inventory from Bookshelves
+    total_inventory = Bookshelves.objects.aggregate(
+        total_qty=Sum('quantity')
+    )['total_qty'] or 0
+    
+    # 3. Total Sales (from Bills)
+    total_sales = Bills.objects.aggregate(
+        total_amount=Sum('totalbill')
+    )['total_amount'] or 0
+    
+    # 4. Total Customers
+    total_customers = Customers.objects.count()
+    
+    # 5. Monthly Statistics
+    monthly_bills = Bills.objects.filter(
+        date__gte=thirty_days_ago
+    ).count()
+    
+    monthly_revenue = Bills.objects.filter(
+        date__gte=thirty_days_ago
+    ).aggregate(
+        revenue=Sum('totalbill')
+    )['revenue'] or 0
+    
+    # 6. Recent Bills (Last 5)
+    recent_bills = Bills.objects.select_related('id_cus').order_by('-date')[:5]
+      # 7. Low Stock Books (quantity < 10)
+    low_stock_books = Bookshelves.objects.select_related('id_book').exclude(
+        quantity__isnull=True
+    ).exclude(
+        quantity=''
+    ).order_by('quantity')[:5]
+    
+    # Filter low stock in Python since quantity is stored as string
+    low_stock_filtered = []
+    for item in low_stock_books:
+        try:
+            qty = int(item.quantity) if item.quantity else 0
+            if qty < 10:
+                low_stock_filtered.append(item)
+        except (ValueError, TypeError):
+            continue
+    low_stock_books = low_stock_filtered[:5]
+    
+    # 8. Popular Books (most sold - from BillDetails)
+    popular_books = Billdetails.objects.select_related('id_book').values(
+        'id_book__bookname', 'id_book__id'
+    ).annotate(
+        total_sold=Sum('quantity')
+    ).order_by('-total_sold')[:5]
+    
+    # 9. Recent Imports
+    recent_imports = Imports.objects.select_related('id_book', 'id_pub').order_by('-lastmodified')[:5]
+    
+    # 10. Smart Inventory Dashboard Data
+    try:
+        inventory_dashboard_data = get_inventory_dashboard_data()
+    except Exception as e:
+        inventory_dashboard_data = {
+            'critical_count': 0,
+            'high_count': 0,
+            'total_alerts': 0,
+            'top_urgent_books': []
+        }
+    
+    context = {
+        'parent': 'dashboard',
+        'segment': 'dashboardv1',
+        # Key Statistics
+        'total_books': total_books,
+        'total_inventory': total_inventory,
+        'total_sales': float(total_sales) if total_sales else 0,
+        'total_customers': total_customers,
+        'monthly_bills': monthly_bills,
+        'monthly_revenue': float(monthly_revenue) if monthly_revenue else 0,
+        # Data for widgets
+        'recent_bills': recent_bills,
+        'low_stock_books': low_stock_books,
+        'popular_books': popular_books,
+        'recent_imports': recent_imports,
+        # Smart Inventory Data
+        'inventory_alerts': inventory_dashboard_data
+    }
+    return render(request, 'pages/index.html', context)
 
 def index2(request):
   context = {
@@ -531,8 +629,20 @@ def book_delete(request, pk):
 # Import Views
 @login_required
 def import_list(request):
-    imports = Imports.objects.all()
-    return render(request, 'import/list.html', {'imports': imports})
+    imports = Imports.objects.all().select_related('id_book', 'id_pub')
+    
+    # Calculate statistics
+    total_quantity = sum(imp.quantity for imp in imports)
+    total_amount = sum(imp.total for imp in imports)
+    avg_price = total_amount / len(imports) if imports else 0
+    
+    context = {
+        'imports': imports,
+        'total_quantity': total_quantity,
+        'total_amount': total_amount,
+        'avg_price': avg_price
+    }
+    return render(request, 'import/list.html', context)
 
 @login_required
 def import_create(request):
@@ -550,8 +660,7 @@ def import_create(request):
             impprice=impprice,
             total=total
         )
-        
-        # Update book quantity in Bookshelves
+          # Update book quantity in Bookshelves
         bookshelf, created = Bookshelves.objects.get_or_create(
             id_book=id_book,
             defaults={'quantity': 0}
@@ -565,6 +674,59 @@ def import_create(request):
     books = Books.objects.all()
     publishers = Publishers.objects.all()
     return render(request, 'import/create.html', {'books': books, 'publishers': publishers})
+
+@login_required
+def import_edit(request, pk):
+    import_record = get_object_or_404(Imports, pk=pk)
+    if request.method == 'POST':
+        old_quantity = import_record.quantity
+        
+        import_record.id_book = get_object_or_404(Books, pk=request.POST.get('id_book'))
+        import_record.id_pub = get_object_or_404(Publishers, pk=request.POST.get('id_pub'))
+        import_record.quantity = int(request.POST.get('quantity'))
+        import_record.impprice = float(request.POST.get('impprice'))
+        import_record.total = import_record.quantity * import_record.impprice
+        import_record.save()
+        
+        # Update bookshelf quantity
+        bookshelf = Bookshelves.objects.get_or_create(
+            id_book=import_record.id_book,
+            defaults={'quantity': 0}
+        )[0]
+        bookshelf.quantity = int(bookshelf.quantity) - int(old_quantity) + import_record.quantity
+        bookshelf.save()
+        
+        messages.success(request, 'Import record updated successfully!')
+        return redirect('import_list')
+    
+    books = Books.objects.all()
+    publishers = Publishers.objects.all()
+    return render(request, 'import/edit.html', {
+        'import': import_record,
+        'books': books,
+        'publishers': publishers
+    })
+
+@login_required
+def import_delete(request, pk):
+    import_record = get_object_or_404(Imports, pk=pk)
+    
+    # Update bookshelf quantity
+    try:
+        bookshelf = Bookshelves.objects.get(id_book=import_record.id_book)
+        bookshelf.quantity = max(0, int(bookshelf.quantity) - import_record.quantity)
+        bookshelf.save()
+    except Bookshelves.DoesNotExist:
+        pass
+    
+    import_record.delete()
+    messages.success(request, 'Import record deleted successfully!')
+    return redirect('import_list')
+
+@login_required
+def import_detail(request, pk):
+    import_record = get_object_or_404(Imports, pk=pk)
+    return render(request, 'import/detail.html', {'import': import_record})
 
 # Bill Views
 @login_required
@@ -888,7 +1050,7 @@ def bill_scan_barcode(request):
     
     # Check if there are desktop-scanned books from camera scanning
     desktop_scanned_books = request.session.pop('desktop_scanned_books', None)
-    if desktop_scanned_books:
+    if (desktop_scanned_books):
         # Merge desktop scanned books with existing scanned books
         for new_book in desktop_scanned_books:
             book_exists = False
@@ -2637,3 +2799,1241 @@ def lookup_barcode(request, barcode_number):
             'success': False,
             'error': str(e)
         })
+
+# Advanced Reports and Analytics Views
+@login_required
+def reports(request):
+    from django.db.models import Sum, Count, Avg, F
+    from django.http import HttpResponse, JsonResponse
+    from datetime import datetime, timedelta
+    import json
+    import csv
+    
+    # Get filter parameters
+    start_date = request.GET.get('start_date') or request.POST.get('start_date')
+    end_date = request.GET.get('end_date') or request.POST.get('end_date')
+    report_type = request.GET.get('report_type') or request.POST.get('report_type', 'sales')
+    export_type = request.GET.get('export')
+    format_type = request.GET.get('format', 'html')
+    
+    # Default date range (last 30 days)
+    if not start_date:
+        start_date = (timezone.now() - timedelta(days=30)).date()
+    else:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    if not end_date:
+        end_date = timezone.now().date()
+    else:
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+    
+    # Calculate summary statistics
+    total_revenue = Bills.objects.filter(
+        date__range=[start_date, end_date]
+    ).aggregate(total=Sum('totalbill'))['total'] or 0
+    
+    total_bills = Bills.objects.filter(
+        date__range=[start_date, end_date]
+    ).count()
+    
+    monthly_revenue = Bills.objects.filter(
+        date__gte=timezone.now().date() - timedelta(days=30)
+    ).aggregate(total=Sum('totalbill'))['total'] or 0
+    
+    monthly_bills = Bills.objects.filter(
+        date__gte=timezone.now().date() - timedelta(days=30)
+    ).count()
+    
+    total_imports = Imports.objects.filter(
+        lastmodified__range=[start_date, end_date]
+    ).count()
+    
+    total_import_value = Imports.objects.filter(
+        lastmodified__range=[start_date, end_date]
+    ).aggregate(total=Sum('total'))['total'] or 0
+    
+    avg_bill_amount = Bills.objects.filter(
+        date__range=[start_date, end_date]
+    ).aggregate(avg=Avg('totalbill'))['avg'] or 0
+    
+    # Top selling books
+    top_books = Billdetails.objects.filter(
+        id_bill__date__range=[start_date, end_date]
+    ).values(
+        'id_book__bookname'
+    ).annotate(
+        total_sold=Sum('quantity'),
+        total_revenue=Sum(F('quantity') * F('price'))
+    ).order_by('-total_sold')[:10]
+    
+    # Top customers
+    top_customers = Bills.objects.filter(
+        date__range=[start_date, end_date]
+    ).values(
+        'id_cus__cusname'
+    ).annotate(
+        bill_count=Count('id'),
+        total_spent=Sum('totalbill')
+    ).order_by('-total_spent')[:10]
+    
+    # Monthly revenue data for chart (last 12 months)
+    month_labels = []
+    revenue_data = []
+    for i in range(11, -1, -1):
+        month_start = (timezone.now().replace(day=1) - timedelta(days=32*i)).replace(day=1)
+        month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        
+        month_revenue = Bills.objects.filter(
+            date__range=[month_start, month_end]
+        ).aggregate(total=Sum('totalbill'))['total'] or 0
+        
+        month_labels.append(month_start.strftime('%b %Y'))
+        revenue_data.append(float(month_revenue))
+    
+    # Category data for pie chart
+    category_labels = []
+    category_data = []
+    categories = Categories.objects.all()[:6]  # Top 6 categories
+    
+    for category in categories:
+        # Get books in this category
+        book_ids = Bookcategories.objects.filter(id_cat=category).values_list('id_book', flat=True)
+        
+        # Calculate sales for these books
+        category_sales = Billdetails.objects.filter(
+            id_book__in=book_ids,
+            id_bill__date__range=[start_date, end_date]
+        ).aggregate(total=Sum('quantity'))['total'] or 0
+        
+        category_labels.append(category.catname or 'Unknown')
+        category_data.append(category_sales)
+    
+    # Handle export requests
+    if export_type and format_type == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        
+        if export_type == 'top_books':
+            response['Content-Disposition'] = 'attachment; filename="top_books.csv"'
+            writer = csv.writer(response)
+            writer.writerow(['Rank', 'Book Name', 'Total Sold', 'Total Revenue'])
+            for i, book in enumerate(top_books, 1):
+                writer.writerow([
+                    i,
+                    book['id_book__bookname'],
+                    book['total_sold'],
+                    f"${book['total_revenue']:.2f}"
+                ])
+            return response
+            
+        elif export_type == 'top_customers':
+            response['Content-Disposition'] = 'attachment; filename="top_customers.csv"'
+            writer = csv.writer(response)
+            writer.writerow(['Rank', 'Customer Name', 'Bill Count', 'Total Spent'])
+            for i, customer in enumerate(top_customers, 1):
+                writer.writerow([
+                    i,
+                    customer['id_cus__cusname'],
+                    customer['bill_count'],
+                    f"${customer['total_spent']:.2f}"
+                ])
+            return response
+    
+    context = {
+        'parent': 'reports',
+        'segment': 'reports',
+        # Summary data
+        'total_revenue': float(total_revenue),
+        'total_bills': total_bills,
+        'monthly_revenue': float(monthly_revenue),
+        'monthly_bills': monthly_bills,
+        'total_imports': total_imports,
+        'total_import_value': float(total_import_value),
+        'avg_bill_amount': float(avg_bill_amount),
+        # Chart data
+        'month_labels': json.dumps(month_labels),
+        'revenue_data': json.dumps(revenue_data),
+        'category_labels': json.dumps(category_labels),
+        'category_data': json.dumps(category_data),
+        # Table data
+        'top_books': top_books,
+        'top_customers': top_customers,
+        # Filter values
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d'),
+        'report_type': report_type,
+    }
+    
+    return render(request, 'pages/reports.html', context)
+
+@login_required
+def advanced_search(request):
+    """
+    Advanced search view with multiple filter options and search types
+    """
+    from django.db.models import Q, Sum, Count, Avg
+    from django.http import HttpResponse, JsonResponse
+    from datetime import datetime, timedelta
+    import json
+    import csv
+    
+    # Initialize search parameters
+    query = request.GET.get('query', '')
+    search_type = request.GET.get('search_type', 'all')
+    category_id = request.GET.get('category')
+    author_id = request.GET.get('author')
+    publisher_id = request.GET.get('publisher')
+    price_min = request.GET.get('price_min')
+    price_max = request.GET.get('price_max')
+    date_from = request.GET.get('date_from')
+    date_to = request.GET.get('date_to')
+    sort_by = request.GET.get('sort_by', 'relevance')
+    export_format = request.GET.get('export')
+    
+    # Initialize result containers
+    books_results = []
+    authors_results = []
+    categories_results = []
+    publishers_results = []
+    customers_results = []
+    total_results = 0
+    
+    # Build search filters
+    search_filters = Q()
+    
+    if query:
+        # Create search filters based on query
+        book_filters = Q(bookname__icontains=query) | Q(description__icontains=query) | Q(barcode_number__icontains=query)
+        author_filters = Q(authorname__icontains=query) | Q(description__icontains=query)
+        category_filters = Q(catname__icontains=query) | Q(description__icontains=query)
+        publisher_filters = Q(pubname__icontains=query) | Q(description__icontains=query)
+        customer_filters = Q(cusname__icontains=query) | Q(phone__icontains=query)
+        
+        # Search Books
+        if search_type in ['all', 'books']:
+            books_query = Books.objects.filter(book_filters)
+            
+            # Apply additional filters
+            if category_id:
+                book_category_ids = Bookcategories.objects.filter(id_cat=category_id).values_list('id_book', flat=True)
+                books_query = books_query.filter(id__in=book_category_ids)
+            
+            if author_id:
+                book_author_ids = Bookauthors.objects.filter(id_author=author_id).values_list('id_book', flat=True)
+                books_query = books_query.filter(id__in=book_author_ids)
+            
+            if publisher_id:
+                books_query = books_query.filter(id_pub=publisher_id)
+            
+            if price_min:
+                try:
+                    books_query = books_query.filter(price__gte=float(price_min))
+                except (ValueError, TypeError):
+                    pass
+            
+            if price_max:
+                try:
+                    books_query = books_query.filter(price__lte=float(price_max))
+                except (ValueError, TypeError):
+                    pass
+            
+            if date_from:
+                try:
+                    date_from_obj = datetime.strptime(date_from, '%Y-%m-%d').date()
+                    books_query = books_query.filter(publishdate__gte=date_from_obj)
+                except ValueError:
+                    pass
+            
+            if date_to:
+                try:
+                    date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
+                    books_query = books_query.filter(publishdate__lte=date_to_obj)
+                except ValueError:
+                    pass
+            
+            # Add related data to books
+            for book in books_query.select_related('id_pub')[:50]:  # Limit results
+                # Get authors
+                book_authors = Bookauthors.objects.filter(id_book=book).select_related('id_author')
+                authors_list = [ba.id_author.authorname for ba in book_authors if ba.id_author.authorname]
+                
+                # Get categories
+                book_categories = Bookcategories.objects.filter(id_book=book).select_related('id_cat')
+                categories_list = [bc.id_cat.catname for bc in book_categories if bc.id_cat.catname]
+                
+                # Get sales data
+                total_sold = Billdetails.objects.filter(id_book=book).aggregate(
+                    total=Sum('quantity')
+                )['total'] or 0
+                
+                books_results.append({
+                    'id': book.id,
+                    'title': book.bookname or 'Unknown Title',
+                    'description': book.description or '',
+                    'price': book.price or 0,
+                    'publisher': book.id_pub.pubname if book.id_pub else 'Unknown Publisher',
+                    'publish_date': book.publishdate,
+                    'authors': authors_list,
+                    'categories': categories_list,
+                    'barcode': book.barcode_number,
+                    'total_sold': total_sold,
+                    'type': 'book'
+                })
+        
+        # Search Authors
+        if search_type in ['all', 'authors']:
+            authors_query = Authors.objects.filter(author_filters)
+            
+            for author in authors_query[:20]:  # Limit results
+                # Get books by this author
+                author_books = Bookauthors.objects.filter(id_author=author).count()
+                
+                authors_results.append({
+                    'id': author.id,
+                    'name': author.authorname or 'Unknown Author',
+                    'description': author.description or '',
+                    'books_count': author_books,
+                    'last_modified': author.lastmodified,
+                    'type': 'author'
+                })
+        
+        # Search Categories
+        if search_type in ['all', 'categories']:
+            categories_query = Categories.objects.filter(category_filters)
+            
+            for category in categories_query[:20]:  # Limit results
+                # Get books in this category
+                category_books = Bookcategories.objects.filter(id_cat=category).count()
+                
+                categories_results.append({
+                    'id': category.id,
+                    'name': category.catname or 'Unknown Category',
+                    'description': category.description or '',
+                    'books_count': category_books,
+                    'last_modified': category.lastmodified,
+                    'type': 'category'
+                })
+        
+        # Search Publishers
+        if search_type in ['all', 'publishers']:
+            publishers_query = Publishers.objects.filter(publisher_filters)
+            
+            for publisher in publishers_query[:20]:  # Limit results
+                # Get books by this publisher
+                publisher_books = Books.objects.filter(id_pub=publisher).count()
+                
+                publishers_results.append({
+                    'id': publisher.id,
+                    'name': publisher.pubname or 'Unknown Publisher',
+                    'description': publisher.description or '',
+                    'books_count': publisher_books,
+                    'last_modified': publisher.lastmodified,
+                    'type': 'publisher'
+                })
+        
+        # Search Customers (if admin/employee)
+        if search_type in ['all', 'customers'] and request.user.is_staff:
+            customers_query = Customers.objects.filter(customer_filters)
+            
+            for customer in customers_query[:20]:  # Limit results                # Get customer purchase history
+                customer_bills = Bills.objects.filter(id_cus=customer).count()
+                total_spent = Bills.objects.filter(id_cus=customer).aggregate(
+                    total=Sum('totalbill')
+                )['total'] or 0
+                
+                customers_results.append({
+                    'id': customer.id,
+                    'name': customer.cusname or 'Unknown Customer',
+                    'phone': customer.phone or '',
+                    'gender': customer.gender or '',
+                    'bills_count': customer_bills,
+                    'total_spent': total_spent,
+                    'type': 'customer'
+                })
+    
+    # Calculate total results
+    total_results = len(books_results) + len(authors_results) + len(categories_results) + len(publishers_results) + len(customers_results)
+    
+    # Sort results
+    if sort_by == 'name':
+        books_results.sort(key=lambda x: x['title'].lower())
+        authors_results.sort(key=lambda x: x['name'].lower())
+        categories_results.sort(key=lambda x: x['name'].lower())
+        publishers_results.sort(key=lambda x: x['name'].lower())
+        customers_results.sort(key=lambda x: x['name'].lower())
+    elif sort_by == 'date':
+        books_results.sort(key=lambda x: x['publish_date'] or datetime.min.date(), reverse=True)
+        authors_results.sort(key=lambda x: x['last_modified'] or datetime.min, reverse=True)
+        categories_results.sort(key=lambda x: x['last_modified'] or datetime.min, reverse=True)
+        publishers_results.sort(key=lambda x: x['last_modified'] or datetime.min, reverse=True)
+    elif sort_by == 'popularity':
+        books_results.sort(key=lambda x: x['total_sold'], reverse=True)
+        authors_results.sort(key=lambda x: x['books_count'], reverse=True)
+        categories_results.sort(key=lambda x: x['books_count'], reverse=True)
+        publishers_results.sort(key=lambda x: x['books_count'], reverse=True)
+    
+    # Handle export requests
+    if export_format == 'csv':
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="search_results_{search_type}.csv"'
+        writer = csv.writer(response)
+        
+        if search_type in ['all', 'books'] and books_results:
+            writer.writerow(['Type', 'Title', 'Authors', 'Publisher', 'Price', 'Categories', 'Total Sold'])
+            for book in books_results:
+                writer.writerow([
+                    'Book',
+                    book['title'],
+                    ', '.join(book['authors']),
+                    book['publisher'],
+                    book['price'],
+                    ', '.join(book['categories']),
+                    book['total_sold']
+                ])
+        
+        if search_type in ['all', 'authors'] and authors_results:
+            writer.writerow(['Type', 'Name', 'Description', 'Books Count'])
+            for author in authors_results:
+                writer.writerow([
+                    'Author',
+                    author['name'],
+                    author['description'],
+                    author['books_count']
+                ])
+        
+        return response
+    
+    # Prepare form data for filters
+    all_categories = Categories.objects.all().order_by('catname')
+    all_authors = Authors.objects.all().order_by('authorname')
+    all_publishers = Publishers.objects.all().order_by('pubname')
+    
+    # Create search statistics
+    search_stats = {
+        'total_results': total_results,
+        'books_count': len(books_results),
+        'authors_count': len(authors_results),
+        'categories_count': len(categories_results),
+        'publishers_count': len(publishers_results),
+        'customers_count': len(customers_results),
+        'search_time': '0.05',  # Mock search time
+    }
+    
+    context = {
+        'parent': 'search',
+        'segment': 'advanced_search',
+        
+        # Search parameters
+        'query': query,
+        'search_type': search_type,
+        'category_id': int(category_id) if category_id else None,
+        'author_id': int(author_id) if author_id else None,
+        'publisher_id': int(publisher_id) if publisher_id else None,
+        'price_min': price_min,
+        'price_max': price_max,
+        'date_from': date_from,
+        'date_to': date_to,
+        'sort_by': sort_by,
+        
+        # Search results
+        'books_results': books_results,
+        'authors_results': authors_results,
+        'categories_results': categories_results,
+        'publishers_results': publishers_results,
+        'customers_results': customers_results,
+        'search_stats': search_stats,
+        
+        # Form data
+        'all_categories': all_categories,
+        'all_authors': all_authors,
+        'all_publishers': all_publishers,
+        
+        # UI flags
+        'has_results': total_results > 0,
+        'show_customers': request.user.is_staff,
+    }
+    
+    return render(request, 'pages/advanced_search.html', context)
+
+@login_required
+def get_ai_recommendations(request):
+    """
+    AI-powered book recommendations using Gemini API
+    """
+    from django.http import JsonResponse
+    import json
+    
+    book_id = request.GET.get('book_id')
+    user_interests = request.GET.get('interests', '')
+    recommendation_type = request.GET.get('type', 'similar')  # similar, related, trending
+    
+    try:
+        # Get book details if book_id is provided
+        book_context = ""
+        if (book_id):
+            try:
+                book = Books.objects.get(id=book_id)
+                # Get book authors and categories
+                authors = Bookauthors.objects.filter(id_book=book).select_related('id_author')
+                categories = Bookcategories.objects.filter(id_book=book).select_related('id_cat')
+                
+                author_names = [ba.id_author.authorname for ba in authors if ba.id_author.authorname]
+                category_names = [bc.id_cat.catname for bc in categories if bc.id_cat.catname]
+                
+                book_context = f"""
+                Book: {book.bookname or 'Unknown'}
+                Description: {book.description or 'No description'}
+                Authors: {', '.join(author_names)}
+                Categories: {', '.join(category_names)}
+                Publisher: {book.id_pub.pubname if book.id_pub else 'Unknown'}
+                """
+            except Books.DoesNotExist:
+                book_context = "Book not found."
+        
+        # Prepare AI prompt based on recommendation type
+        if recommendation_type == 'similar':
+            prompt = f"""
+            Based on this book information:
+            {book_context}
+            
+            User interests: {user_interests}
+            
+            Please recommend 5 similar books that would appeal to someone who liked this book. 
+            Consider the genre, themes, writing style, and target audience.
+            
+            Format your response as a JSON array with the following structure:
+            [
+                {{
+                    "title": "Book Title",
+                    "author": "Author Name",
+                    "reason": "Brief explanation why this book is recommended",
+                    "genre": "Genre",
+                    "rating": "Estimated rating out of 5"
+                }}
+            ]
+            
+            Only return the JSON array, no additional text.
+            """
+        elif recommendation_type == 'trending':
+            prompt = f"""
+            Based on current trends in literature and these user interests: {user_interests}
+            
+            Please recommend 5 trending/popular books that are currently popular among readers.
+            Consider recent publications, award winners, and books gaining attention.
+            
+            Format your response as a JSON array with the following structure:
+            [
+                {{
+                    "title": "Book Title",
+                    "author": "Author Name",
+                    "reason": "Why this book is trending",
+                    "genre": "Genre",
+                    "rating": "Estimated rating out of 5"
+                }}
+            ]
+            
+            Only return the JSON array, no additional text.
+            """
+        else:  # related
+            prompt = f"""
+            Based on this book:
+            {book_context}
+            
+            And user interests: {user_interests}
+            
+            Please recommend 5 books that are thematically related or would be good follow-up reads.
+            Consider books that explore similar themes, historical periods, or philosophical questions.
+            
+            Format your response as a JSON array with the following structure:
+            [
+                {{
+                    "title": "Book Title",
+                    "author": "Author Name", 
+                    "reason": "How this relates to the original book",
+                    "genre": "Genre",
+                    "rating": "Estimated rating out of 5"
+                }}
+            ]
+            
+            Only return the JSON array, no additional text.
+            """
+        
+        # Configure Gemini API
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-pro')
+        
+        # Generate recommendations
+        response = model.generate_content(prompt)
+        ai_response = response.text.strip()
+        
+        # Try to parse the JSON response
+        try:
+            # Clean up the response to extract JSON
+            if ai_response.startswith('```json'):
+                ai_response = ai_response.replace('```json', '').replace('```', '').strip()
+            elif ai_response.startswith('```'):
+                ai_response = ai_response.replace('```', '').strip()
+                
+            recommendations = json.loads(ai_response)
+            
+            return JsonResponse({
+                'success': True,
+                'recommendations': recommendations,
+                'type': recommendation_type,
+                'book_context': book_context if book_id else None
+            })
+            
+        except json.JSONDecodeError:
+            # If JSON parsing fails, return the raw response
+            return JsonResponse({
+                'success': False,
+                'error': 'Failed to parse AI response',
+                'raw_response': ai_response
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+# Smart Inventory Views
+@login_required
+def inventory_alerts(request):
+    """Display smart inventory alerts dashboard"""
+    try:
+        manager = SmartInventoryManager()
+        
+        # Get filter parameters
+        urgency_filter = request.GET.get('urgency', 'all')
+        publisher_filter = request.GET.get('publisher', 'all')
+        
+        # Get all recommendations
+        all_recommendations = manager.smart_restock_alert()
+        
+        # Apply filters
+        filtered_recommendations = all_recommendations
+        
+        if urgency_filter != 'all':
+            filtered_recommendations = [
+                r for r in filtered_recommendations 
+                if r['urgency_level'].lower() == urgency_filter.lower()
+            ]
+        
+        if publisher_filter != 'all':
+            filtered_recommendations = [
+                r for r in filtered_recommendations 
+                if r['publisher_name'] == publisher_filter
+            ]
+        
+        # Get unique publishers for filter dropdown
+        publishers = list(set(r['publisher_name'] for r in all_recommendations))
+        publishers.sort()
+        
+        # Generate summary stats
+        summary_stats = {
+            'total_alerts': len(all_recommendations),
+            'critical_count': len([r for r in all_recommendations if r['urgency_level'] == 'CRITICAL']),
+            'high_count': len([r for r in all_recommendations if r['urgency_level'] == 'HIGH']),
+            'medium_count': len([r for r in all_recommendations if r['urgency_level'] == 'MEDIUM']),
+            'low_count': len([r for r in all_recommendations if r['urgency_level'] == 'LOW']),
+            'total_suggested_qty': sum(r['suggested_order_qty'] for r in all_recommendations)
+        }
+        
+        context = {
+            'parent': 'inventory',
+            'segment': 'alerts',
+            'recommendations': filtered_recommendations,
+            'summary_stats': summary_stats,
+            'publishers': publishers,
+            'current_urgency_filter': urgency_filter,
+            'current_publisher_filter': publisher_filter,
+            'urgency_levels': ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
+        }
+        
+        return render(request, 'inventory/alerts.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error generating inventory alerts: {str(e)}')
+        return render(request, 'inventory/alerts.html', {
+            'parent': 'inventory',
+            'segment': 'alerts',
+            'recommendations': [],
+            'summary_stats': {},
+            'publishers': [],
+            'error': str(e)
+        })
+
+@login_required
+def inventory_analytics(request):
+    """Display inventory analytics and patterns"""
+    try:
+        manager = SmartInventoryManager()
+        
+        # Get book ID from request (if analyzing specific book)
+        book_id = request.GET.get('book_id')
+        
+        if book_id:
+            try:
+                book = Books.objects.get(id=book_id)
+                
+                # Analyze specific book
+                velocity_data = manager.calculate_sales_velocity(book_id)
+                seasonal_data = manager.analyze_seasonal_patterns(book_id)
+                lead_time_data = manager.calculate_supplier_lead_time(book.id_pub.id)
+                recommendation = get_book_restock_recommendation(book_id)
+                
+                context = {
+                    'parent': 'inventory',
+                    'segment': 'analytics',
+                    'book': book,
+                    'velocity_data': velocity_data,
+                    'seasonal_data': seasonal_data,
+                    'lead_time_data': lead_time_data,
+                    'recommendation': recommendation,
+                    'analyzing_specific_book': True
+                }
+                
+            except Books.DoesNotExist:
+                messages.error(request, 'Book not found')
+                return redirect('inventory_analytics')
+        else:
+            # General analytics overview
+            report = manager.generate_inventory_report()
+            
+            # Get top performing books by velocity
+            recent_books = Billdetails.objects.filter(
+                id_bill__date__gte=timezone.now().date() - timedelta(days=30)
+            ).values('id_book').annotate(
+                total_sold=Sum('quantity')
+            ).order_by('-total_sold')[:10]
+            
+            top_books_data = []
+            for book_data in recent_books:
+                try:
+                    book = Books.objects.get(id=book_data['id_book'])
+                    velocity = manager.calculate_sales_velocity(book.id)
+                    top_books_data.append({
+                        'book': book,
+                        'total_sold': book_data['total_sold'],
+                        'velocity_data': velocity
+                    })
+                except Books.DoesNotExist:
+                    continue
+            
+            context = {
+                'parent': 'inventory',
+                'segment': 'analytics',
+                'report': report,
+                'top_books_data': top_books_data,
+                'analyzing_specific_book': False
+            }
+        
+        return render(request, 'inventory/analytics.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error generating analytics: {str(e)}')
+        return render(request, 'inventory/analytics.html', {
+            'parent': 'inventory',
+            'segment': 'analytics',
+            'error': str(e)
+        })
+
+@login_required
+def book_velocity_analysis(request, book_id):
+    """AJAX endpoint for book velocity analysis"""
+    try:
+        manager = SmartInventoryManager()
+        book = Books.objects.get(id=book_id)
+        
+        # Get different time periods
+        velocity_7d = manager.calculate_sales_velocity(book_id, days=7)
+        velocity_30d = manager.calculate_sales_velocity(book_id, days=30)
+        velocity_90d = manager.calculate_sales_velocity(book_id, days=90)
+        
+        seasonal_data = manager.analyze_seasonal_patterns(book_id)
+        recommendation = get_book_restock_recommendation(book_id)
+        
+        data = {
+            'book_id': book_id,
+            'book_name': book.bookname or f"Book {book_id}",
+            'velocity_analysis': {
+                '7_days': velocity_7d,
+                '30_days': velocity_30d,
+                '90_days': velocity_90d
+            },
+            'seasonal_analysis': seasonal_data,
+            'recommendation': recommendation,
+            'success': True
+        }
+        
+        return JsonResponse(data)
+        
+    except Books.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Book not found'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def generate_purchase_order(request):
+    """Generate purchase order based on inventory alerts"""
+    if request.method == 'POST':
+        try:
+            # Get selected book IDs from form
+            selected_books = request.POST.getlist('selected_books')
+            
+            if not selected_books:
+                messages.warning(request, 'Please select at least one book for purchase order.')
+                return redirect('inventory_alerts')
+            
+            manager = SmartInventoryManager()
+            recommendations = manager.smart_restock_alert()
+            
+            # Filter recommendations for selected books
+            selected_recommendations = [
+                r for r in recommendations 
+                if str(r['book_id']) in selected_books
+            ]
+            
+            # Group by publisher for organized purchase orders
+            purchase_orders = manager._group_alerts_by_publisher(selected_recommendations)
+            
+            context = {
+                'parent': 'inventory',
+                'segment': 'purchase_order',
+                'purchase_orders': purchase_orders,
+                'total_items': len(selected_recommendations),
+                'total_quantity': sum(r['suggested_order_qty'] for r in selected_recommendations),
+                'generated_date': timezone.now().date()
+            }
+            
+            return render(request, 'inventory/purchase_order.html', context)
+            
+        except Exception as e:
+            messages.error(request, f'Error generating purchase order: {str(e)}')
+            return redirect('inventory_alerts')
+    
+    return redirect('inventory_alerts')
+
+@login_required
+def inventory_api_alerts(request):
+    """API endpoint for getting inventory alerts (for AJAX)"""
+    try:
+        manager = SmartInventoryManager()
+        recommendations = manager.smart_restock_alert()
+        
+        # Limit to top 20 most urgent
+        top_recommendations = recommendations[:20]
+        
+        return JsonResponse({
+            'success': True,
+            'alerts': top_recommendations,
+            'total_count': len(recommendations),
+            'critical_count': len([r for r in recommendations if r['urgency_level'] == 'CRITICAL']),
+            'high_count': len([r for r in recommendations if r['urgency_level'] == 'HIGH'])
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+# ============================
+# AI IMAGE RECOGNITION VIEWS
+# ============================
+
+@login_required
+def ai_image_recognition_dashboard(request):
+    """Main dashboard for AI Image Recognition features"""
+    try:
+        # Get recent AI analyses
+        recent_analyses = Books.objects.filter(
+            last_ai_analysis__isnull=False
+        ).order_by('-last_ai_analysis')[:10]
+        
+        # Get damage statistics
+        damage_stats = Books.objects.filter(
+            damage_status__isnull=False
+        ).values('damage_status').annotate(count=Count('id'))
+        
+        # Get AI confidence statistics
+        high_confidence = Books.objects.filter(ai_confidence_score__gte=0.8).count()
+        medium_confidence = Books.objects.filter(
+            ai_confidence_score__gte=0.5, 
+            ai_confidence_score__lt=0.8
+        ).count()
+        low_confidence = Books.objects.filter(ai_confidence_score__lt=0.5).count()
+        
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'dashboard',
+            'recent_analyses': recent_analyses,
+            'damage_stats': damage_stats,
+            'confidence_stats': {
+                'high': high_confidence,
+                'medium': medium_confidence,
+                'low': low_confidence
+            },
+            'total_analyzed': Books.objects.filter(last_ai_analysis__isnull=False).count()
+        }
+        
+        return render(request, 'ai_recognition/dashboard.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading AI dashboard: {str(e)}')
+        return redirect('index')
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def book_cover_analyzer(request):
+    """Book cover analysis interface"""
+    if request.method == 'POST':
+        try:
+            if 'cover_image' not in request.FILES:
+                return JsonResponse({'success': False, 'error': 'No image provided'})
+            
+            uploaded_file = request.FILES['cover_image']
+            
+            # Save uploaded file temporarily
+            temp_filename = f"temp_cover_{uuid.uuid4()}.{uploaded_file.name.split('.')[-1]}"
+            temp_path = default_storage.save(f"temp/{temp_filename}", uploaded_file)
+            
+            try:
+                # Process the image
+                full_path = default_storage.path(temp_path)
+                result = process_book_cover_image(full_path)
+                
+                # If processing successful, save to book if book_id provided
+                if result['success'] and request.POST.get('book_id'):
+                    book_id = request.POST.get('book_id')
+                    book = get_object_or_404(Books, id=book_id)
+                    
+                    # Update book with AI analysis
+                    book.cover_image = uploaded_file
+                    book.ai_extracted_title = result['book_info']['title']
+                    book.ai_extracted_authors = json.dumps(result['book_info']['authors'])
+                    book.ai_suggested_category = result['suggested_category']
+                    book.ai_confidence_score = result['book_info']['confidence']
+                    book.damage_status = result['damage_assessment']['severity']
+                    book.damage_details = json.dumps(result['damage_assessment'])
+                    book.last_ai_analysis = django_timezone.now()
+                    book.save()
+                    
+                    result['book_updated'] = True
+                
+                return JsonResponse(result)
+                
+            finally:
+                # Clean up temporary file
+                if default_storage.exists(temp_path):
+                    default_storage.delete(temp_path)
+                    
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    else:
+        # GET request - show the interface
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'cover_analyzer',
+            'books': Books.objects.all()[:100]  # For selection dropdown
+        }
+        
+        return render(request, 'ai_recognition/cover_analyzer.html', context)
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def inventory_counter(request):
+    """Inventory counting through image recognition"""
+    if request.method == 'POST':
+        try:
+            if 'shelf_image' not in request.FILES:
+                return JsonResponse({'success': False, 'error': 'No image provided'})
+            
+            uploaded_file = request.FILES['shelf_image']
+            
+            # Save uploaded file temporarily
+            temp_filename = f"temp_shelf_{uuid.uuid4()}.{uploaded_file.name.split('.')[-1]}"
+            temp_path = default_storage.save(f"temp/{temp_filename}", uploaded_file)
+            
+            try:
+                # Count books in the image
+                full_path = default_storage.path(temp_path)
+                result = count_books_in_shelf(full_path)
+                
+                # Add shelf information if provided
+                if request.POST.get('shelf_id'):
+                    shelf_id = request.POST.get('shelf_id')
+                    shelf = get_object_or_404(Shelves, id=shelf_id)
+                    result['shelf_name'] = shelf.shelfname
+                    result['area_name'] = shelf.id_area.areaname if shelf.id_area else 'Unknown'
+                
+                return JsonResponse(result)
+                
+            finally:
+                # Clean up temporary file
+                if default_storage.exists(temp_path):
+                    default_storage.delete(temp_path)
+                    
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    else:
+        # GET request - show the interface
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'inventory_counter',
+            'shelves': Shelves.objects.all()  # For selection dropdown
+        }
+        
+        return render(request, 'ai_recognition/inventory_counter.html', context)
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def damage_assessor(request):
+    """Book damage assessment interface"""
+    if request.method == 'POST':
+        try:
+            if 'book_image' not in request.FILES:
+                return JsonResponse({'success': False, 'error': 'No image provided'})
+            
+            uploaded_file = request.FILES['book_image']
+            
+            # Save uploaded file temporarily
+            temp_filename = f"temp_damage_{uuid.uuid4()}.{uploaded_file.name.split('.')[-1]}"
+            temp_path = default_storage.save(f"temp/{temp_filename}", uploaded_file)
+            
+            try:
+                # Assess damage
+                full_path = default_storage.path(temp_path)
+                result = assess_book_damage(full_path)
+                
+                # Update book record if book_id provided
+                if result['success'] and request.POST.get('book_id'):
+                    book_id = request.POST.get('book_id')
+                    book = get_object_or_404(Books, id=book_id)
+                    
+                    damage_info = result['damage_assessment']
+                    book.damage_status = damage_info['severity']
+                    book.damage_details = json.dumps(damage_info)
+                    book.last_ai_analysis = django_timezone.now()
+                    book.save()
+                    
+                    result['book_updated'] = True
+                
+                return JsonResponse(result)
+                
+            finally:
+                # Clean up temporary file
+                if default_storage.exists(temp_path):
+                    default_storage.delete(temp_path)
+                    
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    else:
+        # GET request - show the interface
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'damage_assessor',
+            'books': Books.objects.all()[:100]  # For selection dropdown
+        }
+        
+        return render(request, 'ai_recognition/damage_assessor.html', context)
+
+@login_required
+def auto_categorizer(request):
+    """Auto-categorization management interface"""
+    try:
+        # Get books that need categorization (no category assigned)
+        uncategorized_books = Books.objects.filter(
+            Q(ai_suggested_category__isnull=True) | Q(ai_suggested_category='')
+        ).filter(cover_image__isnull=False)[:50]
+        
+        # Get recently categorized books
+        recently_categorized = Books.objects.filter(
+            ai_suggested_category__isnull=False
+        ).exclude(ai_suggested_category='').order_by('-last_ai_analysis')[:20]
+        
+        # Get category statistics
+        category_stats = Books.objects.filter(
+            ai_suggested_category__isnull=False
+        ).exclude(ai_suggested_category='').values(
+            'ai_suggested_category'
+        ).annotate(count=Count('id')).order_by('-count')
+        
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'auto_categorizer',
+            'uncategorized_books': uncategorized_books,
+            'recently_categorized': recently_categorized,
+            'category_stats': category_stats,
+            'available_categories': Categories.objects.all()
+        }
+        
+        return render(request, 'ai_recognition/auto_categorizer.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error loading categorizer: {str(e)}')
+        return redirect('ai_image_recognition_dashboard')
+
+@csrf_exempt
+@login_required
+def batch_categorize_books(request):
+    """Batch categorize books using AI"""
+    if request.method == 'POST':
+        try:
+            book_ids = request.POST.getlist('book_ids')
+            
+            if not book_ids:
+                return JsonResponse({'success': False, 'error': 'No books selected'})
+            
+            results = []
+            
+            for book_id in book_ids:
+                try:
+                    book = get_object_or_404(Books, id=book_id)
+                    
+                    if not book.cover_image:
+                        results.append({
+                            'book_id': book_id,
+                            'success': False,
+                            'error': 'No cover image'
+                        })
+                        continue
+                    
+                    # Process the cover image
+                    image_path = book.cover_image.path
+                    result = process_book_cover_image(image_path)
+                    
+                    if result['success']:
+                        # Update book with AI analysis
+                        book.ai_extracted_title = result['book_info']['title']
+                        book.ai_extracted_authors = json.dumps(result['book_info']['authors'])
+                        book.ai_suggested_category = result['suggested_category']
+                        book.ai_confidence_score = result['book_info']['confidence']
+                        book.damage_status = result['damage_assessment']['severity']
+                        book.damage_details = json.dumps(result['damage_assessment'])
+                        book.last_ai_analysis = django_timezone.now()
+                        book.save()
+                        
+                        results.append({
+                            'book_id': book_id,
+                            'success': True,
+                            'category': result['suggested_category'],
+                            'confidence': result['book_info']['confidence']
+                        })
+                    else:
+                        results.append({
+                            'book_id': book_id,
+                            'success': False,
+                            'error': result.get('error', 'Analysis failed')
+                        })
+                        
+                except Exception as e:
+                    results.append({
+                        'book_id': book_id,
+                        'success': False,
+                        'error': str(e)
+                    })
+            
+            successful_count = len([r for r in results if r['success']])
+            
+            return JsonResponse({
+                'success': True,
+                'results': results,
+                'processed_count': len(results),
+                'successful_count': successful_count
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+@login_required
+def ai_analysis_report(request):
+    """Generate comprehensive AI analysis report"""
+    try:
+        # Get analysis statistics
+        total_books = Books.objects.count()
+        analyzed_books = Books.objects.filter(last_ai_analysis__isnull=False).count()
+        
+        # Damage statistics
+        damage_breakdown = Books.objects.values('damage_status').annotate(
+            count=Count('id')
+        ).order_by('damage_status')
+        
+        # Category accuracy (books with both AI and manual categories)
+        category_comparison = Books.objects.filter(
+            ai_suggested_category__isnull=False
+        ).exclude(ai_suggested_category='')
+        
+        # Recent analysis trends (last 30 days)
+        thirty_days_ago = django_timezone.now() - timedelta(days=30)
+        recent_analyses = Books.objects.filter(
+            last_ai_analysis__gte=thirty_days_ago
+        ).extra(
+            select={'day': 'date(last_ai_analysis)'}
+        ).values('day').annotate(count=Count('id')).order_by('day')
+        
+        # Top AI-suggested categories
+        top_categories = Books.objects.filter(
+            ai_suggested_category__isnull=False
+        ).exclude(ai_suggested_category='').values(
+            'ai_suggested_category'
+        ).annotate(count=Count('id')).order_by('-count')[:10]
+        
+        context = {
+            'parent': 'ai_recognition',
+            'segment': 'analysis_report',
+            'total_books': total_books,
+            'analyzed_books': analyzed_books,
+            'analysis_percentage': round((analyzed_books / total_books * 100), 2) if total_books > 0 else 0,
+            'damage_breakdown': damage_breakdown,
+            'category_comparison': category_comparison,
+            'recent_analyses': recent_analyses,
+            'top_categories': top_categories,
+            'report_generated': django_timezone.now()
+        }
+        
+        return render(request, 'ai_recognition/analysis_report.html', context)
+        
+    except Exception as e:
+        messages.error(request, f'Error generating report: {str(e)}')
+        return redirect('ai_image_recognition_dashboard')
+
+@csrf_exempt
+@login_required
+def api_book_cover_analysis(request, book_id):
+    """API endpoint for book cover analysis"""
+    if request.method == 'POST':
+        try:
+            book = get_object_or_404(Books, id=book_id)
+            
+            if not book.cover_image:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'No cover image available for this book'
+                })
+            
+            # Process the cover image
+            result = process_book_cover_image(book.cover_image.path)
+            
+            if result['success']:
+                # Update book with AI analysis
+                book.ai_extracted_title = result['book_info']['title']
+                book.ai_extracted_authors = json.dumps(result['book_info']['authors'])
+                book.ai_suggested_category = result['suggested_category']
+                book.ai_confidence_score = result['book_info']['confidence']
+                book.damage_status = result['damage_assessment']['severity']
+                book.damage_details = json.dumps(result['damage_assessment'])
+                book.last_ai_analysis = django_timezone.now()
+                book.save()
+            
+            return JsonResponse(result)
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

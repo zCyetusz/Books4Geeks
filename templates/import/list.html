@@ -1,0 +1,245 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}Import Management - Books4Geeks{% endblock %}
+
+{% block content %}
+<div class="content-wrapper">
+    <!-- Content Header -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Import Management</h1>
+                </div>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+                        <li class="breadcrumb-item active">Imports</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Import Records</h3>
+                            <div class="card-tools">
+                                <a href="{% url 'import_create' %}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-plus"></i> New Import
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-{{ message.tags }} alert-dismissible">
+                                        <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+                                        {{ message }}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped" id="importTable">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Book</th>
+                                            <th>Publisher</th>
+                                            <th>Quantity</th>
+                                            <th>Import Price</th>
+                                            <th>Total Amount</th>
+                                            <th>Import Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for import in imports %}
+                                        <tr>
+                                            <td>{{ import.id }}</td>
+                                            <td>
+                                                <div class="media">
+                                                    {% if import.id_book.image %}
+                                                        <img src="{{ import.id_book.image.url }}" 
+                                                             alt="{{ import.id_book.bookname }}" 
+                                                             class="img-size-32 mr-2">
+                                                    {% else %}
+                                                        <div class="bg-secondary img-size-32 mr-2 d-flex align-items-center justify-content-center">
+                                                            <i class="fas fa-book text-white"></i>
+                                                        </div>
+                                                    {% endif %}
+                                                    <div class="media-body">
+                                                        <strong>{{ import.id_book.bookname }}</strong><br>
+                                                        <small class="text-muted">{{ import.id_book.isbn }}</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-info">{{ import.id_pub.pubname }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge badge-primary">{{ import.quantity }}</span>
+                                            </td>
+                                            <td>
+                                                ${{ import.impprice|floatformat:2 }}
+                                            </td>
+                                            <td>
+                                                <strong class="text-success">${{ import.total|floatformat:2 }}</strong>
+                                            </td>
+                                            <td>
+                                                {% if import.created_at %}
+                                                    {{ import.created_at|date:"M d, Y" }}
+                                                {% else %}
+                                                    <span class="text-muted">N/A</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <a href="{% url 'import_edit' import.id %}" 
+                                                       class="btn btn-warning btn-sm" title="Edit">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <button class="btn btn-danger btn-sm" 
+                                                            onclick="confirmDelete({{ import.id }}, '{{ import.id_book.bookname }}')"
+                                                            title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <a href="{% url 'import_detail' import.id %}" 
+                                                       class="btn btn-info btn-sm" title="View Details">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="8" class="text-center">
+                                                <div class="empty-state">
+                                                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                                                    <h5 class="text-muted">No import records found</h5>
+                                                    <p class="text-muted">Start by importing your first books</p>
+                                                    <a href="{% url 'import_create' %}" class="btn btn-success">
+                                                        <i class="fas fa-plus"></i> Create Import Record
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    {% if imports %}
+                                    <tfoot>
+                                        <tr class="bg-light">
+                                            <th colspan="4">Total:</th>
+                                            <th>{{ total_quantity }}</th>
+                                            <th>${{ total_amount|floatformat:2 }}</th>
+                                            <th colspan="2"></th>
+                                        </tr>
+                                    </tfoot>
+                                    {% endif %}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Cards -->
+            <div class="row">
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3>{{ imports.count }}</h3>
+                            <p>Total Imports</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-bag"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3>${{ total_amount|floatformat:0 }}</h3>
+                            <p>Total Value</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-stats-bars"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3>{{ total_quantity }}</h3>
+                            <p>Books Imported</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-ios-book"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3>${{ avg_price|floatformat:2 }}</h3>
+                            <p>Avg. Price</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-pie-graph"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete import record for <strong id="bookName"></strong>?</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <a href="#" id="deleteConfirmBtn" class="btn btn-danger">Delete</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+$(document).ready(function() {
+    $('#importTable').DataTable({
+        "responsive": true,
+        "lengthChange": false,
+        "autoWidth": false,
+        "order": [[ 0, "desc" ]],
+        "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
+    }).buttons().container().appendTo('#importTable_wrapper .col-md-6:eq(0)');
+});
+
+function confirmDelete(importId, bookName) {
+    $('#bookName').text(bookName);
+    $('#deleteConfirmBtn').attr('href', '{% url "import_delete" 0 %}'.replace('0', importId));
+    $('#deleteModal').modal('show');
+}
+</script>
+{% endblock %}

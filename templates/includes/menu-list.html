@@ -940,6 +940,82 @@
     </ul>
   </li>
   
+  <!-- Smart Inventory Management -->
+  <li class="nav-item {% if 'inventory' in parent %} menu-open {% endif %}">
+    <a href="#" class="nav-link {% if 'inventory' in parent %} active {% endif %}">
+      <i class="nav-icon fas fa-brain"></i>
+      <p>
+        Smart Inventory
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'inventory_alerts' %}" class="nav-link {% if 'alerts' in segment %} active {% endif %}">
+          <i class="far fa-bell nav-icon"></i>
+          <p>
+            Restock Alerts
+            <span class="badge badge-danger right" id="alertsBadge">New</span>
+          </p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'inventory_analytics' %}" class="nav-link {% if 'analytics' in segment %} active {% endif %}">
+          <i class="far fa-chart-line nav-icon"></i>
+          <p>Analytics & Insights</p>
+        </a>
+      </li>
+    </ul>  </li>
+  
+  <!-- AI Image Recognition -->
+  <li class="nav-item {% if 'ai_recognition' in parent %} menu-open {% endif %}">
+    <a href="#" class="nav-link {% if 'ai_recognition' in parent %} active {% endif %}">
+      <i class="nav-icon fas fa-camera-retro"></i>
+      <p>
+        AI Recognition
+        <i class="right fas fa-angle-left"></i>
+      </p>
+    </a>
+    <ul class="nav nav-treeview">
+      <li class="nav-item">
+        <a href="{% url 'ai_image_recognition_dashboard' %}" class="nav-link {% if 'ai_image_recognition_dashboard' in segment %} active {% endif %}">
+          <i class="far fa-tachometer-alt nav-icon"></i>
+          <p>AI Dashboard</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'book_cover_analyzer' %}" class="nav-link {% if 'book_cover_analyzer' in segment %} active {% endif %}">
+          <i class="far fa-image nav-icon"></i>
+          <p>Cover Analyzer</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'inventory_counter' %}" class="nav-link {% if 'inventory_counter' in segment %} active {% endif %}">
+          <i class="far fa-calculator nav-icon"></i>
+          <p>Smart Counting</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'damage_assessor' %}" class="nav-link {% if 'damage_assessor' in segment %} active {% endif %}">
+          <i class="far fa-search nav-icon"></i>
+          <p>Damage Assessor</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'auto_categorizer' %}" class="nav-link {% if 'auto_categorizer' in segment %} active {% endif %}">
+          <i class="far fa-tags nav-icon"></i>
+          <p>Auto-Categorizer</p>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a href="{% url 'ai_analysis_report' %}" class="nav-link {% if 'ai_analysis_report' in segment %} active {% endif %}">
+          <i class="far fa-chart-bar nav-icon"></i>
+          <p>Analysis Reports</p>
+        </a>
+      </li>
+    </ul>
+  </li>
+  
   <!-- Bills -->
   <li class="nav-item">
     <a href="#" class="nav-link">
@@ -1043,8 +1119,34 @@
           <p>Create Reservation</p>
         </a>
       </li>
-    </ul>
+    </ul>  </li>
+
+  <!-- Advanced Search -->
+  <li class="nav-item {% if 'search' in parent %} menu-open {% endif %}">
+    <a
+      href="{% url 'advanced_search' %}"
+      class="nav-link {% if 'search' in parent %} active {% endif %}"
+    >
+      <i class="nav-icon fas fa-search"></i>
+      <p>
+        Advanced Search
+      </p>
+    </a>
   </li>
+
+  <!-- Reports & Analytics -->
+  <li class="nav-item {% if 'reports' in parent %} menu-open {% endif %}">
+    <a
+      href="{% url 'reports' %}"
+      class="nav-link {% if 'reports' in parent %} active {% endif %}"
+    >
+      <i class="nav-icon fas fa-chart-line"></i>
+      <p>
+        Reports & Analytics
+      </p>
+    </a>
+  </li>
+
   <li class="nav-item">
     <a href="{% url 'logout' %}" class="nav-link direct-link">
       <i class="fa fa-sign-out-alt nav-icon"></i>

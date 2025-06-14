@@ -1,0 +1,301 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %} Purchase Order Generator {% endblock title %}
+
+{% block bodyclass %} hold-transition sidebar-mini {% endblock bodyclass %}
+
+{% block content %}
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+  <!-- Content Header (Page header) -->
+  <section class="content-header">
+    <div class="container-fluid">
+      <div class="row mb-2">
+        <div class="col-sm-6">
+          <h1>Purchase Order</h1>
+        </div>
+        <div class="col-sm-6">
+          <ol class="breadcrumb float-sm-right">
+            <li class="breadcrumb-item"><a href="{% url 'dashboardv3' %}">Home</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'inventory_alerts' %}">Inventory Alerts</a></li>
+            <li class="breadcrumb-item active">Purchase Order</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main content -->
+  <section class="content">
+    <div class="container-fluid">
+      
+      <!-- Summary Card -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-shopping-cart"></i>
+                Purchase Order Summary
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-primary btn-sm" onclick="printPurchaseOrder()">
+                  <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-success btn-sm" onclick="exportToCsv()">
+                  <i class="fas fa-download"></i> Export CSV
+                </button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <table class="table table-sm">
+                    <tr>
+                      <td><strong>Generated Date:</strong></td>
+                      <td>{{ generated_date }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total Items:</strong></td>
+                      <td>{{ total_items }}</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Total Quantity:</strong></td>
+                      <td>{{ total_quantity }} units</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Number of Publishers:</strong></td>
+                      <td>{{ purchase_orders|length }}</td>
+                    </tr>
+                  </table>
+                </div>
+                <div class="col-md-6">
+                  <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb"></i> Smart Recommendations</h6>
+                    <p class="mb-0">This purchase order was generated based on:</p>
+                    <ul class="mb-0 mt-2">
+                      <li>Current sales velocity patterns</li>
+                      <li>Seasonal demand adjustments</li>
+                      <li>Supplier lead times</li>
+                      <li>Safety stock requirements</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchase Orders by Publisher -->
+      {% for publisher, books in purchase_orders.items %}
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-building"></i>
+                {{ publisher }}
+              </h3>
+              <div class="card-tools">
+                <span class="badge badge-primary">{{ books|length }} books</span>
+                <span class="badge badge-success">
+                  {% with publisher_total=0 %}
+                    {% for book in books %}
+                      {% with publisher_total=publisher_total|add:book.suggested_order_qty %}{% endwith %}
+                    {% endfor %}
+                    {{ publisher_total }} units
+                  {% endwith %}
+                </span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="table-responsive">
+                <table class="table table-striped publisher-table" data-publisher="{{ publisher }}">
+                  <thead>
+                    <tr>
+                      <th>Book ID</th>
+                      <th>Book Name</th>
+                      <th>Current Stock</th>
+                      <th>Daily Velocity</th>
+                      <th>Reorder Point</th>
+                      <th>Suggested Quantity</th>
+                      <th>Urgency</th>
+                      <th>Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for book in books %}
+                    <tr>
+                      <td>{{ book.book_id }}</td>
+                      <td>
+                        <strong>{{ book.book_name }}</strong>
+                      </td>
+                      <td>
+                        <span class="badge {% if book.current_stock <= 0 %}badge-danger{% elif book.current_stock <= 5 %}badge-warning{% else %}badge-info{% endif %}">
+                          {{ book.current_stock }}
+                        </span>
+                      </td>
+                      <td>{{ book.daily_velocity }}/day</td>
+                      <td>{{ book.reorder_point }}</td>
+                      <td>
+                        <strong class="text-success">{{ book.suggested_order_qty }}</strong> units
+                      </td>
+                      <td>
+                        <span class="badge 
+                          {% if book.urgency_level == 'CRITICAL' %}badge-danger
+                          {% elif book.urgency_level == 'HIGH' %}badge-warning
+                          {% elif book.urgency_level == 'MEDIUM' %}badge-info
+                          {% else %}badge-success{% endif %}">
+                          {{ book.urgency_level }}
+                        </span>
+                      </td>
+                      <td>
+                        <small>{{ book.recommendation_reason }}</small>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot>
+                    <tr class="table-info">
+                      <th colspan="5">Publisher Total:</th>
+                      <th>
+                        <strong>
+                          {% with publisher_total=0 %}
+                            {% for book in books %}
+                              {% with publisher_total=publisher_total|add:book.suggested_order_qty %}{% endwith %}
+                            {% endfor %}
+                            {{ publisher_total }} units
+                          {% endwith %}
+                        </strong>
+                      </th>
+                      <th colspan="2"></th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              
+              <!-- Publisher Contact Info (if available) -->
+              <div class="mt-3">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle"></i>
+                  Contact your {{ publisher }} representative to place this order.
+                  Lead time: Estimated 5-14 days based on historical data.
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      <!-- Actions -->
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body text-center">
+              <a href="{% url 'inventory_alerts' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Alerts
+              </a>
+              <button type="button" class="btn btn-primary" onclick="printPurchaseOrder()">
+                <i class="fas fa-print"></i> Print Purchase Order
+              </button>
+              <button type="button" class="btn btn-success" onclick="exportToCsv()">
+                <i class="fas fa-download"></i> Export to CSV
+              </button>
+              <button type="button" class="btn btn-info" onclick="emailPurchaseOrder()">
+                <i class="fas fa-envelope"></i> Email Order
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<script>
+function printPurchaseOrder() {
+  window.print();
+}
+
+function exportToCsv() {
+  let csvContent = "data:text/csv;charset=utf-8,";
+  csvContent += "Publisher,Book ID,Book Name,Current Stock,Daily Velocity,Reorder Point,Suggested Quantity,Urgency,Reason\n";
+  
+  $('.publisher-table').each(function() {
+    const publisher = $(this).data('publisher');
+    $(this).find('tbody tr').each(function() {
+      const row = $(this).find('td').map(function() {
+        return '"' + $(this).text().trim().replace(/"/g, '""') + '"';
+      }).get();
+      csvContent += publisher + ',' + row.join(',') + '\n';
+    });
+  });
+  
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "purchase_order_{{ generated_date|date:'Y-m-d' }}.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function emailPurchaseOrder() {
+  // This would typically integrate with an email service
+  alert('Email functionality would be integrated with your email system. For now, please print or export the purchase order.');
+}
+
+// Print styles
+document.addEventListener('DOMContentLoaded', function() {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      .card-tools, .btn, .breadcrumb, .content-header {
+        display: none !important;
+      }
+      .card {
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .card-header {
+        background: #f8f9fa !important;
+        border-bottom: 2px solid #dee2e6 !important;
+      }
+      body {
+        font-size: 12px;
+      }
+      .table {
+        font-size: 11px;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+});
+</script>
+
+<style>
+.publisher-table tbody tr:hover {
+  background-color: rgba(0,123,255,.075);
+}
+
+.table tfoot th {
+  border-top: 2px solid #dee2e6;
+  font-weight: bold;
+}
+
+@media print {
+  .card + .card {
+    page-break-before: always;
+  }
+}
+</style>
+{% endblock extra_scripts %}
