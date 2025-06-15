@@ -10,15 +10,80 @@
   .book-details {
     max-height: 200px;
     overflow-y: auto;
+    border-radius: 4px;
+    padding: 5px;
+    background-color: #f8f9fa;
   }
   .book-item {
     font-size: 0.9em;
+    padding: 4px 6px;
+    margin-bottom: 2px;
+    background-color: white;
+    border-radius: 3px;
+    border-left: 3px solid #007bff;
   }
   .book-item:last-child {
     border-bottom: none !important;
+    margin-bottom: 0;
   }
   #bills-table td {
     vertical-align: top;
+  }
+  .btn-group .btn {
+    margin-right: 2px;
+  }
+  .table th {
+    background-color: #f8f9fa;
+    border-top: none;
+  }
+  .badge {
+    font-size: 0.75em;
+  }
+  .alert {
+    border-radius: 6px;
+  }
+  
+  /* Responsive improvements */
+  @media (max-width: 768px) {
+    .book-details {
+      max-height: 150px;
+      font-size: 0.85em;
+    }
+    .btn-group .btn {
+      padding: 0.25rem 0.4rem;
+      font-size: 0.8rem;
+    }
+    .card-tools .btn {
+      margin-bottom: 5px;
+    }
+  }
+    /* DataTable styling improvements */
+  .dataTables_wrapper .dataTables_filter input {
+    border-radius: 4px;
+  }
+  .dataTables_wrapper .dataTables_length select {
+    border-radius: 4px;
+  }
+  
+  /* Django Pagination styling */
+  .pagination .page-link {
+    border-radius: 4px;
+    margin: 0 2px;
+    border: 1px solid #dee2e6;
+  }
+  .pagination .page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+  }
+  .pagination .page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #fff;
+    border-color: #dee2e6;
+  }
+  .dataTables_info {
+    padding-top: 8px;
+    font-size: 0.9em;
+    color: #6c757d;
   }
 </style>
 {% endblock stylesheets %}
@@ -33,10 +98,9 @@
       <div class="row mb-2">
         <div class="col-sm-6">
           <h1>Bills</h1>
-        </div>
-        <div class="col-sm-6">
+        </div>        <div class="col-sm-6">
           <ol class="breadcrumb float-sm-right">
-            <li class="breadcrumb-item"><a href="/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
             <li class="breadcrumb-item active">Bills</li>
           </ol>
         </div>
@@ -49,20 +113,50 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-12">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Bills List</h3>
-              <div class="card-tools">
-                <a href="{% url 'bill_create' %}" class="btn btn-primary btn-sm ajax-link">
-                  <i class="fas fa-plus"></i> Create New Bill
-                </a>
-                <a href="{% url 'bill_scan_barcode' %}" class="btn btn-success btn-sm ajax-link">
-                  <i class="fas fa-barcode"></i> Scan Barcode
-                </a>
+          <div class="card">            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-receipt"></i> Bills List
+              </h3>              <div class="card-tools">
+                <div class="btn-group" role="group">
+                  <a href="{% url 'bill_create' %}" class="btn btn-primary btn-sm ajax-link">
+                    <i class="fas fa-plus"></i> Create New Bill
+                  </a>
+                  <a href="{% url 'bill_scan_barcode' %}" class="btn btn-success btn-sm ajax-link">
+                    <i class="fas fa-barcode"></i> Scan Barcode
+                  </a>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="refreshBillsList()" title="Refresh List">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                  </button>
+                </div>
               </div>
-            </div>
-            <!-- /.card-header -->
+            </div>            <!-- /.card-header -->
             <div class="card-body">
+              {% if bills %}                <!-- Summary Stats -->
+                <div class="row mb-3">
+                  <div class="col-md-12">
+                    <div class="alert alert-info mb-3" style="background: linear-gradient(90deg, #d1ecf1, #bee5eb); border: none;">                      <div class="row">
+                        <div class="col-md-3 text-center">
+                          <h5 class="mb-1"><i class="fas fa-receipt text-info"></i> {{ paginator.count }}</h5>
+                          <small>Total Bills</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                          <h5 class="mb-1"><i class="fas fa-list text-primary"></i> {{ bills|length }}</h5>
+                          <small>This Page</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                          <h5 class="mb-1"><i class="fas fa-calendar text-success"></i> {% now "M d" %}</h5>
+                          <small>{% now "Y" %}</small>
+                        </div>
+                        <div class="col-md-3 text-center">
+                          <h5 class="mb-1"><i class="fas fa-clock text-warning"></i> {% now "H:i" %}</h5>
+                          <small>Current Time</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+              
               {% if messages %}
                 {% for message in messages %}
                   <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -72,57 +166,134 @@
                     </button>
                   </div>
                 {% endfor %}
-              {% endif %}
-                <table id="bills-table" class="table table-bordered table-striped">
+              {% endif %}                <table id="bills-table" class="table table-bordered table-striped">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>Customer</th>
-                    <th>Books & Details</th>
-                    <th>Total Bill</th>
-                    <th>Date</th>
-                    <th>Actions</th>
+                    <th><i class="fas fa-hashtag"></i> ID</th>
+                    <th><i class="fas fa-user"></i> Customer</th>
+                    <th><i class="fas fa-book"></i> Books & Details</th>
+                    <th><i class="fas fa-dollar-sign"></i> Total Bill</th>
+                    <th><i class="fas fa-calendar"></i> Date</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {% for bill in bills %}
+                <tbody>{% for bill in bills %}
                     <tr>
-                      <td>{{ bill.id }}</td>
-                      <td>{{ bill.id_cus.cusname }}</td>
+                      <td><strong>#{{ bill.id }}</strong></td>
+                      <td>
+                        {% if bill.id_cus %}
+                          {{ bill.id_cus.cusname }}
+                        {% else %}
+                          <span class="text-muted">No customer</span>
+                        {% endif %}
+                      </td>
                       <td>
                         {% if bill.details %}
                           <div class="book-details">
                             {% for detail in bill.details %}
                               <div class="book-item mb-1" style="padding: 3px 0; border-bottom: 1px solid #eee;">
-                                <strong>{{ detail.id_book.description }}</strong>
+                                <strong>
+                                  {% if detail.id_book %}
+                                    {{ detail.id_book.description|truncatechars:40 }}
+                                  {% else %}
+                                    <span class="text-muted">Unknown book</span>
+                                  {% endif %}
+                                </strong>
                                 <small class="text-muted d-block">
-                                  Qty: {{ detail.quantity }} × ${{ detail.price|floatformat:2 }} = ${{ detail.total|floatformat:2 }}
+                                  Qty: {{ detail.quantity|default:1 }} × 
+                                  ${{ detail.price|floatformat:2|default:"0.00" }} = 
+                                  ${{ detail.total|floatformat:2|default:"0.00" }}
                                 </small>
                               </div>
                             {% endfor %}
+                            <div class="mt-1">
+                              <small class="badge badge-info">{{ bill.details|length }} item{{ bill.details|length|pluralize }}</small>
+                            </div>
                           </div>
                         {% else %}
                           <span class="text-muted">No items</span>
                         {% endif %}
                       </td>
-                      <td><strong>${{ bill.totalbill|floatformat:2 }}</strong></td>
-                      <td>{{ bill.date }}</td>
                       <td>
-                        <a href="{% url 'bill_edit' bill.id %}" class="btn btn-info btn-sm ajax-link">
-                          <i class="fas fa-edit"></i> Edit
-                        </a>
-                        <a href="#" class="btn btn-danger btn-sm delete-bill" data-id="{{ bill.id }}">
-                          <i class="fas fa-trash"></i> Delete
-                        </a>
+                        <strong class="text-success">${{ bill.totalbill|floatformat:2|default:"0.00" }}</strong>
+                      </td>                      <td>
+                        <small>{{ bill.date|date:"M d, Y" }}</small><br>
+                        <small class="text-muted">{{ bill.date|time:"H:i" }}</small>
                       </td>
-                    </tr>
-                  {% empty %}
+                    </tr>                  {% empty %}
                     <tr>
-                      <td colspan="6" class="text-center">No bills found.</td>
+                      <td colspan="5" class="text-center">No bills found.</td>
                     </tr>
                   {% endfor %}
                 </tbody>
               </table>
+              
+              <!-- Django Pagination Controls -->
+              {% if is_paginated %}
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <div class="dataTables_info">
+                      Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} bills
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <nav aria-label="Bills pagination">
+                      <ul class="pagination justify-content-end mb-0">
+                        {% if page_obj.has_previous %}
+                          <li class="page-item">
+                            <a class="page-link" href="?page=1" aria-label="First">
+                              <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                          </li>
+                          <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                              <span aria-hidden="true">&laquo;</span>
+                            </a>
+                          </li>
+                        {% else %}
+                          <li class="page-item disabled">
+                            <span class="page-link">&laquo;&laquo;</span>
+                          </li>
+                          <li class="page-item disabled">
+                            <span class="page-link">&laquo;</span>
+                          </li>
+                        {% endif %}
+                        
+                        {% for num in page_obj.paginator.page_range %}
+                          {% if page_obj.number == num %}
+                            <li class="page-item active">
+                              <span class="page-link">{{ num }}</span>
+                            </li>
+                          {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                              <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            </li>
+                          {% endif %}
+                        {% endfor %}
+                        
+                        {% if page_obj.has_next %}
+                          <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+                              <span aria-hidden="true">&raquo;</span>
+                            </a>
+                          </li>
+                          <li class="page-item">
+                            <a class="page-link" href="?page={{ paginator.num_pages }}" aria-label="Last">
+                              <span aria-hidden="true">&raquo;&raquo;</span>
+                            </a>
+                          </li>
+                        {% else %}
+                          <li class="page-item disabled">
+                            <span class="page-link">&raquo;</span>
+                          </li>
+                          <li class="page-item disabled">
+                            <span class="page-link">&raquo;&raquo;</span>
+                          </li>
+                        {% endif %}
+                      </ul>
+                    </nav>
+                  </div>
+                </div>
+              {% endif %}
             </div>
             <!-- /.card-body -->
           </div>
@@ -133,29 +304,7 @@
       <!-- /.row -->
     </div>
     <!-- /.container-fluid -->
-  </section>
-  <!-- /.content -->
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        Are you sure you want to delete this bill?
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-        <a href="#" id="confirmDelete" class="btn btn-danger">Delete</a>
-      </div>
-    </div>
-  </div>
+  </section>  <!-- /.content -->
 </div>
 
 {% endblock content %}
@@ -176,28 +325,53 @@
 <script src="{% static 'plugins/datatables-buttons/js/buttons.print.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-buttons/js/buttons.colVis.min.js' %}"></script>
 
-<script>
-  $(function () {
-    // DataTable initialization
-    $("#bills-table").DataTable({
+<script>  $(function () {    // DataTable initialization - with Django pagination
+    var billsTable = $("#bills-table").DataTable({
       "responsive": true, 
-      "lengthChange": false, 
+      "lengthChange": false,  // Disable DataTables length change
       "autoWidth": false,
-      "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"]
-    }).buttons().container().appendTo('#bills-table_wrapper .col-md-6:eq(0)');
+      "paging": false,        // Disable DataTables pagination (using Django pagination)
+      "info": false,          // Disable DataTables info (using Django pagination info)
+      "order": [],            // Disable initial sorting (handled by Django view)      "columnDefs": [
+        { "width": "10%", "targets": 0 }, // ID column
+        { "width": "20%", "targets": 1 }, // Customer column
+        { "width": "40%", "targets": 2 }, // Books column
+        { "width": "15%", "targets": 3 }, // Total column
+        { "width": "15%", "targets": 4 }, // Date column
+        { "orderable": false, "targets": [2] } // Disable sorting for Books column only
+      ],
+      "buttons": ["copy", "csv", "excel", "pdf", "print", "colvis"],
+      "language": {
+        "search": "Search current page:",
+        "emptyTable": "No bills available",
+        "zeroRecords": "No matching bills found on this page"
+      }    }).buttons().container().appendTo('#bills-table_wrapper .col-md-6:eq(0)');
     
-    // Delete confirmation
-    $('.delete-bill').on('click', function(e) {
+    // Make sure all ajax-link elements use AJAX navigation
+    $(document).on('click', '.ajax-link', function(e) {
       e.preventDefault();
       var billId = $(this).data('id');
-      $('#confirmDelete').attr('href', '/bills/delete/' + billId + '/');
+      var billRow = $(this).closest('tr');
+      var customerName = billRow.find('td:nth-child(2)').text().trim();
+      
+      // Update modal content with bill info
+      $('#deleteModal .modal-body').html(
+        'Are you sure you want to delete Bill #' + billId + 
+        (customerName !== 'No customer' ? ' for customer "' + customerName + '"' : '') + 
+        '?<br><small class="text-muted">This action cannot be undone.</small>'
+      );
+      
+      $('#confirmDelete').attr('href', "{% url 'bill_delete' 0 %}".replace('0', billId));
       $('#deleteModal').modal('show');
     });
-    
-    // Handle AJAX request for deleting
+      // Handle AJAX request for deleting
     $('#confirmDelete').on('click', function(e) {
       e.preventDefault();
       var url = $(this).attr('href');
+      var deleteBtn = $(this);
+      
+      // Show loading state
+      deleteBtn.html('<i class="fas fa-spinner fa-spin"></i> Deleting...').prop('disabled', true);
       
       $.ajax({
         url: url,
@@ -205,22 +379,44 @@
         headers: {'X-Requested-With': 'XMLHttpRequest'},
         success: function(response) {
           $('#deleteModal').modal('hide');
+          
+          // Show success message
+          var alertHtml = '<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                         'Bill deleted successfully!' +
+                         '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                         '<span aria-hidden="true">&times;</span></button></div>';
+          
           // If loadContent function exists, use it
           if (typeof loadContent === 'function') {
             loadContent("{% url 'bill_list' %}");
           } else {
             // Otherwise reload the page
-            window.location.href = "{% url 'bill_list' %}";
+            window.location.reload();
           }
         },
-        error: function(error) {
+        error: function(xhr, status, error) {
           console.error("Error deleting bill:", error);
-          alert("Error deleting bill. Please try again.");
+          $('#deleteModal').modal('hide');
+          
+          var errorMsg = 'Error deleting bill. Please try again.';
+          if (xhr.responseJSON && xhr.responseJSON.error) {
+            errorMsg = xhr.responseJSON.error;
+          }
+          
+          var alertHtml = '<div class="alert alert-danger alert-dismissible fade show" role="alert">' +
+                         errorMsg +
+                         '<button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
+                         '<span aria-hidden="true">&times;</span></button></div>';
+          
+          $('.card-body').prepend(alertHtml);
+        },
+        complete: function() {
+          // Reset button state
+          deleteBtn.html('Delete').prop('disabled', false);
         }
       });
     });
-    
-    // Make sure all ajax-link elements use AJAX navigation
+      // Make sure all ajax-link elements use AJAX navigation
     $(document).on('click', '.ajax-link', function(e) {
       e.preventDefault();
       var url = $(this).attr('href');
@@ -230,6 +426,29 @@
         window.location.href = url;
       }
     });
+      // Refresh function for bills list
+    window.refreshBillsList = function() {
+      var refreshBtn = $('.btn:contains("Refresh")');
+      var originalContent = refreshBtn.html();
+      
+      refreshBtn.html('<i class="fas fa-spinner fa-spin"></i> Refreshing...').prop('disabled', true);
+      
+      // Get current page from URL parameters
+      var urlParams = new URLSearchParams(window.location.search);
+      var currentPage = urlParams.get('page') || '1';
+      var refreshUrl = "{% url 'bill_list' %}" + "?page=" + currentPage;
+      
+      if (typeof loadContent === 'function') {
+        loadContent(refreshUrl);
+      } else {
+        window.location.href = refreshUrl;
+      }
+      
+      // Reset button after a delay (in case AJAX doesn't trigger page reload)
+      setTimeout(function() {
+        refreshBtn.html(originalContent).prop('disabled', false);
+      }, 2000);
+    };
   });
 </script>
 

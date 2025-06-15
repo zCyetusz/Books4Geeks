@@ -1,13 +1,4 @@
 #!/usr/bin/env python
-"""
-AI Image Recognition System for Books4Geeks
-Provides computer vision capabilities for book management:
-- Book cover recognition and information extraction
-- Automatic categorization based on visual analysis
-- Damage detection for quality control
-- Smart inventory counting through image processing
-"""
-
 import os
 import cv2
 import numpy as np

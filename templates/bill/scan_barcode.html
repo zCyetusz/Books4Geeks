@@ -11,6 +11,8 @@
 <link rel="stylesheet" href="{% static 'plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css' %}">
 <!-- Toastr -->
 <link rel="stylesheet" href="{% static 'plugins/toastr/toastr.min.css' %}">
+<!-- QuaggaJS for barcode scanning -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <style>  /* Scanner viewport styling */
   #interactive.viewport {
     position: relative;
@@ -43,13 +45,30 @@
     50% { transform: translateX(100%) translateY(100%); }
     100% { transform: translateX(-100%) translateY(-100%); }
   }
-  
-  #interactive.viewport img {
+    #interactive.viewport img {
     max-width: 100%;
     max-height: 100%;
     border-radius: 15px;
     z-index: 2;
     position: relative;
+  }
+  
+  /* Camera feed styling */
+  #camera-container {
+    text-align: center;
+    position: relative;
+  }
+  
+  #camera-video {
+    border: 2px solid #007bff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background: #000;
+  }
+  
+  #scan-status {
+    margin-top: 10px;
+    border-radius: 10px;
   }
     /* Enhanced card styling with glassmorphism */
   .card {
@@ -855,17 +874,42 @@
                     <div class="card-header">
                       <h3 class="card-title">
                         <i class="fas fa-camera"></i> Camera Feed
-                      </h3>
-                      <div class="card-tools">
-                        <a href="{% url 'bill_scan_barcode_desktop' %}" class="btn btn-success btn-sm">
-                          <i class="fas fa-play"></i> Start Scanner (Desktop)
+                      </h3>                      <div class="card-tools">
+                        <button id="start-camera-btn" class="btn btn-success btn-sm" onclick="startWebCamera()">
+                          <i class="fas fa-play"></i> Start Scanner
+                        </button>
+                        <button id="stop-camera-btn" class="btn btn-danger btn-sm" onclick="stopWebCamera()" style="display: none;">
+                          <i class="fas fa-stop"></i> Stop Scanner
+                        </button>
+                        <a href="{% url 'bill_scan_barcode_desktop' %}" class="btn btn-info btn-sm">
+                          <i class="fas fa-desktop"></i> Desktop Scanner
                         </a>
+                      </div>                    </div>                    <div class="card-body">
+                      <!-- Scanner Methods Info -->
+                      <div class="alert alert-light border" style="margin-bottom: 15px;">
+                        <strong><i class="fas fa-info-circle text-info"></i> Scanner Options:</strong>
+                        <ul class="mb-0 mt-2">
+                          <li><strong>Web Scanner:</strong> Use "Start Scanner" for browser-based scanning (recommended)</li>
+                          <li><strong>Desktop Scanner:</strong> Opens a separate window (may not work on all systems)</li>
+                          <li><strong>Manual Entry:</strong> Type barcode numbers directly</li>
+                          <li><strong>Test Mode:</strong> Demo with sample books</li>
+                        </ul>
                       </div>
-                    </div>
-                    <div class="card-body">
-                      <div class="alert alert-info">
-                        <i class="fas fa-info-circle"></i> Clicking "Start Scanner" will open the camera on the server computer. 
-                        You will see a camera window where barcodes will be scanned. Press 'c' key to complete scanning and return to the web interface.
+                      
+                      <div class="alert alert-info" id="camera-info">
+                        <i class="fas fa-info-circle"></i> Click "Start Scanner" to activate your webcam for barcode scanning.
+                        Make sure to allow camera access when prompted by your browser.
+                      </div>
+                      
+                      <!-- Camera Feed -->
+                      <div id="camera-container" style="display: none;">
+                        <video id="camera-video" autoplay playsinline style="width: 100%; max-width: 640px; border-radius: 10px;"></video>
+                        <canvas id="camera-canvas" style="display: none;"></canvas>
+                        <div class="mt-2">
+                          <div class="alert alert-success" id="scan-status" style="display: none;">
+                            <i class="fas fa-check-circle"></i> <span id="scan-message">Ready to scan...</span>
+                          </div>
+                        </div>
                       </div>
                         <form method="post" class="form-group mt-3">
                         {% csrf_token %}
@@ -1204,16 +1248,19 @@ $(function () {
       }
     });
   }
-  
-  // Fallback method using POST with CSRF token
+    // Fallback method using POST with CSRF token
   function lookupBarcodeWithPost(barcode) {
     $.ajax({
-      url: '/api/process_barcode/',
+      url: window.location.href,  // Use current page URL
       type: 'POST',
-      contentType: 'application/json',
-      data: JSON.stringify({
-        barcode: barcode
-      }),
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      data: {
+        'action': 'add_manual_barcode',
+        'barcode_number': barcode,
+        'csrfmiddlewaretoken': csrftoken
+      },
       headers: {
         'X-CSRFToken': csrftoken
       },
@@ -1253,8 +1300,7 @@ $(function () {
       }
     }
     
-    if (!bookExists) {
-      // Add book to the list
+    if (!bookExists) {      // Add book to the list
       var newBook = {
         id: book.id,
         description: book.description,
@@ -1263,7 +1309,7 @@ $(function () {
         publisher: book.publisher,
         authors: Array.isArray(book.authors) ? book.authors.join(', ') : book.authors,
         categories: Array.isArray(book.categories) ? book.categories.join(', ') : book.categories,
-        scanned_by: 'manual'  // Track how this book was added
+        scanned_by: book.scanned_by || 'camera'  // Use the scanned_by value from the book data
       };
       
       scannedBooks.push(newBook);
@@ -1546,8 +1592,211 @@ $(function () {
       } catch (e) {
         console.log("Audio not supported:", e);
       }
-    }
-  }
+    }  }
 });
+
+// Web Camera and Barcode Scanner Functions
+let isScanning = false;
+let stream = null;
+let video = null;
+let canvas = null;
+let context = null;
+
+function startWebCamera() {
+  video = document.getElementById('camera-video');
+  canvas = document.getElementById('camera-canvas');
+  context = canvas.getContext('2d');
+  
+  const startBtn = document.getElementById('start-camera-btn');
+  const stopBtn = document.getElementById('stop-camera-btn');
+  const cameraContainer = document.getElementById('camera-container');
+  const cameraInfo = document.getElementById('camera-info');
+  const scanStatus = document.getElementById('scan-status');
+  
+  // Check if browser supports getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toastr.error('Your browser does not support camera access. Please use a modern browser.');
+    return;
+  }
+  
+  // Request camera access
+  navigator.mediaDevices.getUserMedia({ 
+    video: { 
+      facingMode: 'environment', // Try to use back camera on mobile
+      width: { ideal: 640 },
+      height: { ideal: 480 }
+    } 
+  })
+  .then(function(mediaStream) {
+    stream = mediaStream;
+    video.srcObject = stream;
+    
+    // Show camera feed and hide info
+    cameraContainer.style.display = 'block';
+    cameraInfo.style.display = 'none';
+    scanStatus.style.display = 'block';
+    document.getElementById('scan-message').textContent = 'Camera started. Position barcode in view...';
+    
+    // Update buttons
+    startBtn.style.display = 'none';
+    stopBtn.style.display = 'inline-block';
+    
+    // Start scanning when video is ready
+    video.onloadedmetadata = function() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      isScanning = true;
+      startBarcodeDetection();
+    };
+    
+    toastr.success('Camera started successfully!');
+  })
+  .catch(function(error) {
+    console.error('Error accessing camera:', error);
+    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+      toastr.error('Camera access denied. Please allow camera permissions and try again.');
+    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+      toastr.error('No camera found. Please connect a camera and try again.');
+    } else {
+      toastr.error('Error accessing camera: ' + error.message);
+    }
+  });
+}
+
+function stopWebCamera() {
+  isScanning = false;
+  
+  // Stop QuaggaJS if it's running
+  if (typeof Quagga !== 'undefined') {
+    Quagga.stop();
+  }
+  
+  // Stop camera stream
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+  
+  // Reset UI
+  const startBtn = document.getElementById('start-camera-btn');
+  const stopBtn = document.getElementById('stop-camera-btn');
+  const cameraContainer = document.getElementById('camera-container');
+  const cameraInfo = document.getElementById('camera-info');
+  const scanStatus = document.getElementById('scan-status');
+  
+  cameraContainer.style.display = 'none';
+  cameraInfo.style.display = 'block';
+  scanStatus.style.display = 'none';
+  startBtn.style.display = 'inline-block';
+  stopBtn.style.display = 'none';
+  
+  toastr.info('Camera stopped.');
+}
+
+function startBarcodeDetection() {
+  if (!isScanning) return;
+  
+  // Initialize QuaggaJS for better barcode detection
+  if (typeof Quagga !== 'undefined') {
+    Quagga.init({
+      inputStream: {
+        name: "Live",
+        type: "LiveStream",
+        target: document.querySelector('#camera-video'),
+        constraints: {
+          width: 640,
+          height: 480,
+          facingMode: "environment"
+        }
+      },
+      decoder: {
+        readers: [
+          "code_128_reader",
+          "ean_reader",
+          "ean_8_reader",
+          "code_39_reader",
+          "code_39_vin_reader",
+          "codabar_reader",
+          "upc_reader",
+          "upc_e_reader",
+          "i2of5_reader"
+        ]
+      }
+    }, function(err) {
+      if (err) {
+        console.log('QuaggaJS initialization error:', err);
+        // Fallback to basic detection
+        basicBarcodeDetection();
+        return;
+      }
+      
+      Quagga.start();
+      
+      // Set up detection callback
+      Quagga.onDetected(function(data) {
+        const barcode = data.codeResult.code;
+        document.getElementById('scan-message').textContent = 'Barcode detected: ' + barcode;
+        processDetectedBarcode(barcode);
+      });
+    });
+  } else {
+    // Fallback if QuaggaJS is not available
+    basicBarcodeDetection();
+  }
+}
+
+function basicBarcodeDetection() {
+  if (!isScanning) return;
+  
+  // Capture frame from video
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  // Check if BarcodeDetector is available (experimental API)
+  if ('BarcodeDetector' in window) {
+    const barcodeDetector = new BarcodeDetector();
+    barcodeDetector.detect(canvas)
+      .then(barcodes => {
+        if (barcodes.length > 0) {
+          const barcode = barcodes[0].rawValue;
+          document.getElementById('scan-message').textContent = 'Barcode detected: ' + barcode;
+          processDetectedBarcode(barcode);
+        }
+      })
+      .catch(err => {
+        console.log('Barcode detection error:', err);
+      });
+  } else {
+    document.getElementById('scan-message').textContent = 'Point camera at barcode or use manual input below.';
+  }
+  
+  // Continue scanning
+  if (isScanning) {
+    requestAnimationFrame(basicBarcodeDetection);
+  }
+}
+
+function processDetectedBarcode(barcode) {
+  if (!barcode || barcode.trim() === '') return;
+  
+  // Prevent duplicate rapid scans
+  if (window.lastScannedBarcode === barcode && 
+      Date.now() - window.lastScanTime < 2000) {
+    return;
+  }
+  
+  window.lastScannedBarcode = barcode;
+  window.lastScanTime = Date.now();
+  
+  // Update scan status
+  document.getElementById('scan-message').textContent = 'Processing barcode: ' + barcode;
+  
+  // Play success sound
+  playSound('success');
+  
+  // Lookup the barcode
+  lookupBarcodeWithPost(barcode.trim());
+  
+  toastr.success('Barcode scanned: ' + barcode);
+}
 </script>
 {% endblock javascripts %}

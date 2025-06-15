@@ -1,25 +1,25 @@
 Books4Geeks Database Export
 ========================
-Exported on: 2025-06-02 21:33:28
+Exported on: 2025-06-15 17:46:53
 
 Total models: 17
-Total records: 44
+Total records: 373
 
 Models and record counts:
 - UserProfile: 0 records
-- Publishers: 2 records
-- Categories: 2 records
-- Authors: 2 records
-- Books: 6 records
-- Bookauthors: 7 records
-- Bookcategories: 7 records
+- Publishers: 3 records
+- Categories: 3 records
+- Authors: 3 records
+- Books: 11 records
+- Bookauthors: 12 records
+- Bookcategories: 12 records
 - Imports: 0 records
-- Customers: 1 records
-- Bills: 6 records
-- Billdetails: 7 records
-- Areas: 0 records
-- Shelves: 0 records
-- Bookshelves: 0 records
+- Customers: 2 records
+- Bills: 157 records
+- Billdetails: 159 records
+- Areas: 1 records
+- Shelves: 1 records
+- Bookshelves: 5 records
 - Employees: 0 records
 - Reservations: 2 records
 - ReservationItems: 2 records

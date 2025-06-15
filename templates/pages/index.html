@@ -176,8 +176,7 @@ layout-fixed {% endblock bodyclass %} {% block content %}
                   {% if inventory_alerts.top_urgent_books %}
                   <ul class="list-unstyled">
                     {% for book in inventory_alerts.top_urgent_books|slice:":3" %}
-                    <li class="mb-2">
-                      <span class="badge badge-{{ book.urgency_level|lower == 'critical'|yesno:'danger,warning' }}">
+                    <li class="mb-2">                      <span class="badge badge-{% if book.urgency_level|lower == 'critical' %}danger{% else %}warning{% endif %}">
                         {{ book.urgency_level }}
                       </span>
                       <strong>{{ book.book_name|truncatechars:30 }}</strong><br>

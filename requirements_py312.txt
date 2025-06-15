@@ -1,0 +1,176 @@
+# Core Django Framework
+django==4.2.8
+django-admin-adminlte==1.0.14
+
+# Production Server
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Environment & Configuration
+python-dotenv==1.0.1
+
+# Database
+mysqlclient==2.2.4
+
+# Image Processing & Computer Vision
+Pillow>=9.5.0,<10.0.0  # Using a version that has pre-built wheels for Python 3.12
+opencv-python==4.8.1.78
+numpy==1.26.4
+
+# AI & Machine Learning
+google-generativeai==0.3.2
+
+# Barcode Generation & Reading
+python-barcode==0.15.1
+pyzbar==0.1.9
+
+# HTTP Requests
+requests==2.31.0
+
+# Mock Data Generation
+Faker==19.6.2
+
+# Date/Time Handling
+python-dateutil==2.8.2
+
+# Data Processing
+pandas>=2.0.0,<2.1.0  # Use a version with pre-built wheels
+
+# Excel/CSV Support
+openpyxl==3.1.2
+
+# PDF Generation
+reportlab==4.0.4
+
+# JSON Handling
+jsonschema==4.19.0
+
+# Utilities
+six==1.16.0
+urllib3==2.0.4
+
+# Security
+cryptography==41.0.3
+
+# API Development
+djangorestframework==3.14.0
+
+# Timezone Support
+pytz==2023.3
+
+# CORS Handling
+django-cors-headers==4.3.0
+
+# Django Extensions
+django-extensions==3.2.3
+
+# File Handling & Storage
+python-magic==0.4.27
+django-storages==1.14.2
+
+# Excel/Spreadsheet Support
+xlsxwriter==3.1.9
+
+# Testing & Quality Assurance
+pytest==7.4.0
+pytest-django==4.5.2
+pytest-cov==4.1.0
+factory-boy==3.3.0
+
+# Code Quality & Formatting
+flake8==6.0.0
+black==23.7.0
+isort==5.12.0
+
+# Development Tools
+django-debug-toolbar==4.2.0
+# django-seed==0.3.1  # Removed due to compatibility issues
+
+# Additional AI/ML Libraries
+scikit-learn==1.3.2  # Compatible version for Python 3.12
+scipy==1.11.4  # Compatible version for Python 3.12
+
+# Enhanced Image Processing
+scikit-image==0.21.0
+imageio==2.31.1
+imutils==0.5.4
+
+# Text Processing
+nltk==3.8.1
+textblob==0.17.1
+
+# Visualization
+matplotlib>=3.7.1,<3.8.0  # Compatible version for Python 3.12
+seaborn==0.12.2
+
+# Logging & Monitoring
+colorlog==6.7.0
+
+# Performance & Caching
+redis==4.6.0
+django-redis==5.3.0
+
+# Email & Communication
+django-email-verification==0.3.3
+
+# Forms & Widgets
+django-crispy-forms==2.0
+crispy-bootstrap4==2022.1
+
+# Pagination
+django-bootstrap-pagination==1.7.1
+
+# Search & Filtering
+django-filter==23.2
+
+# Task Queue (Optional)
+celery==5.3.1
+
+# Image Thumbnails
+easy-thumbnails==2.8.5
+
+# UUID Support
+shortuuid==1.0.11
+
+# Backup & Migration
+django-dbbackup==4.0.2
+
+# Admin Enhancements
+django-import-export==3.2.0
+django-admin-list-filter-dropdown==1.0.3
+
+# API Documentation
+drf-spectacular==0.26.4
+
+# WebSocket Support (Optional)
+channels==4.0.0
+channels-redis==4.1.0
+
+# Social Authentication (Optional)
+django-allauth==0.54.0
+
+# Content Management
+django-ckeditor==6.6.1
+django-summernote==0.8.20.0
+
+# Internationalization
+django-modeltranslation==0.18.11
+
+# Monitoring & Analytics
+django-analytical==3.1.0
+
+# Rate Limiting
+django-ratelimit==4.1.0
+
+# Geographic Support (Optional)
+# django-leaflet==0.29.0
+# folium==0.14.0
+
+# Machine Learning Model Serving
+joblib==1.3.1
+pickle-mixin==1.0.2
+
+# Additional Utilities
+python-slugify==8.0.1
+django-environ==0.10.0
+django-model-utils==4.3.1

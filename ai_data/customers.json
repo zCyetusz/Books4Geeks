@@ -1,1 +1,1 @@
-[{"model": "B4G.customers", "pk": 1, "fields": {"cusname": "Long", "gender": "Other", "phone": "14124214214", "lastmodified": "2025-05-21T14:30:24.443Z"}}]
+[{"model": "B4G.customers", "pk": 1, "fields": {"cusname": "Long", "gender": "Other", "phone": "14124214214", "lastmodified": "2025-05-21T14:30:24.443Z"}}, {"model": "B4G.customers", "pk": 2, "fields": {"cusname": "Test Customer", "gender": "M", "phone": "1234567890", "lastmodified": "2025-06-12T09:33:48.104Z"}}]

@@ -1,0 +1,23 @@
+# Auto-generated requirements file 
+# Base requirements 
+django==4.2.9 
+python-dotenv==1.0.1 
+mysqlclient==2.2.7 
+whitenoise==6.6.0  # For serving static files
+Pillow>=9.5.0,<10.0.0  # Replaces PIL
+
+# External libraries
+django-admin-adminlte==1.0.14  # For admin theme
+python-barcode==0.15.1  # For barcode generation
+opencv-python==4.8.1.78  # For cv2
+easyocr==1.7.0  # For OCR capabilities
+google-generativeai==0.3.2  # For Google AI integration
+numpy==1.26.3  # For numerical operations
+pyzbar==0.1.9  # For barcode reading
+requests==2.31.0  # For HTTP requests
+
+# Additional dependencies commonly needed
+djangorestframework==3.14.0  # For API development
+django-cors-headers==4.3.0  # For CORS handling
+django-extensions==3.2.3  # For Django development utilities
+python-magic==0.4.27  # For file type detection

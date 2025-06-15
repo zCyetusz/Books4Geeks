@@ -1,24 +1,24 @@
 {
-  "timestamp": "2025-06-02 21:33:28",
+  "timestamp": "2025-06-15 17:46:53",
   "exported_models": {
     "UserProfile": 0,
-    "Publishers": 2,
-    "Categories": 2,
-    "Authors": 2,
-    "Books": 6,
-    "Bookauthors": 7,
-    "Bookcategories": 7,
+    "Publishers": 3,
+    "Categories": 3,
+    "Authors": 3,
+    "Books": 11,
+    "Bookauthors": 12,
+    "Bookcategories": 12,
     "Imports": 0,
-    "Customers": 1,
-    "Bills": 6,
-    "Billdetails": 7,
-    "Areas": 0,
-    "Shelves": 0,
-    "Bookshelves": 0,
+    "Customers": 2,
+    "Bills": 157,
+    "Billdetails": 159,
+    "Areas": 1,
+    "Shelves": 1,
+    "Bookshelves": 5,
     "Employees": 0,
     "Reservations": 2,
     "ReservationItems": 2
   },
   "total_models": 17,
-  "total_records": 44
+  "total_records": 373
 }

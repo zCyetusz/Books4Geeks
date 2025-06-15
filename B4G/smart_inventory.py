@@ -1,8 +1,5 @@
 # -*- encoding: utf-8 -*-
-"""
-Smart Inventory Alerts System for Books4Geeks
-Provides intelligent restocking alerts based on sales velocity, seasonal patterns, and supplier lead times.
-"""
+
 
 from django.db.models import Sum, Avg, Count, Q
 from django.utils import timezone

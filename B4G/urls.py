@@ -5,6 +5,7 @@ from django.contrib.auth import views as auth_views
 urlpatterns = [
     # Pages
     path('', views.index),
+    path('dashboard/', views.index, name='dashboard'),  # Add missing dashboard URL
     path('dashboard-v2/', views.index2, name='dashboardv2'),
     path('dashboard-v3/', views.index3, name='dashboardv3'),
 

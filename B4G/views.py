@@ -731,13 +731,24 @@ def import_detail(request, pk):
 # Bill Views
 @login_required
 def bill_list(request):
+    from django.core.paginator import Paginator
+    
     # Get all bills with related customer data and prefetch related bill details
-    bills = Bills.objects.select_related('id_cus').prefetch_related(
+    bills_queryset = Bills.objects.select_related('id_cus').prefetch_related(
         'billdetails_set__id_book'
-    ).all()
+    ).order_by('-id')  # Order by newest first
+    
+    # Set up pagination - 20 bills per page
+    paginator = Paginator(bills_queryset, 20)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        bills_page = paginator.get_page(page_number)
+    except:
+        bills_page = paginator.get_page(1)
     
     # Add bill details to each bill for template display
-    for bill in bills:
+    for bill in bills_page:
         bill.details = bill.billdetails_set.all()
     
     template = 'bill/list.html'
@@ -746,7 +757,14 @@ def bill_list(request):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         template = 'bill/ajax_list.html'
         
-    return render(request, template, {'bills': bills})
+    context = {
+        'bills': bills_page,
+        'page_obj': bills_page,
+        'is_paginated': bills_page.has_other_pages(),
+        'paginator': paginator
+    }
+        
+    return render(request, template, context)
 
 @login_required
 def bill_create(request):
@@ -962,14 +980,35 @@ def bill_scan_barcode(request):
                             'quantity': 1,
                             'publisher': book.id_pub.pubname if book.id_pub else None,
                             'authors': authors,
-                            'categories': categories,                            'scanned_by': 'manual'
-                        })
+                            'categories': categories,                            'scanned_by': 'manual'                        })
                     
                     request.session['scanned_books'] = scanned_books
                     messages.success(request, f"Added book: {book.description}")
                     
+                    # Return JSON response for AJAX requests
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': True,
+                            'message': f'Added book: {book.description}',                            'book': {
+                                'id': book.id,
+                                'description': book.description,
+                                'price': str(book.price),
+                                'quantity': 1,
+                                'publisher': book.id_pub.pubname if book.id_pub else None,
+                                'authors': authors,
+                                'categories': categories,
+                                'scanned_by': 'camera'
+                            }
+                        })
+                    
                 except Books.DoesNotExist:
                     messages.error(request, f"Book with barcode {barcode_number} not found")
+                    # Return JSON response for AJAX requests
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'success': False,
+                            'error': f'Book not found with barcode: {barcode_number}'
+                        })
         
         elif action == 'remove_book':
             book_index = int(request.POST.get('book_index', -1))
@@ -2128,22 +2167,53 @@ def scan_barcode_desktop(request):
             # Show book count
             count_text = f"Books: {len(scanned_books)}"
             cv2.putText(frame, count_text, (10, frame.shape[0] - 10), 
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-              # Display the frame
-            cv2.imshow("Books4Geeks Barcode Scanner", frame)
-            
-            # Break if 'c' is pressed or window is closed
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('c') or key == 27:  # 'c' or ESC key
-                break
-            
-            # Check if window was closed
-            if cv2.getWindowProperty("Books4Geeks Barcode Scanner", cv2.WND_PROP_VISIBLE) < 1:
-                break
-        
-        # Clean up
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)            # Display the frame (with error handling for Windows/virtual environments)
+            try:
+                cv2.imshow("Books4Geeks Barcode Scanner", frame)
+                
+                # Break if 'c' is pressed or window is closed
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord('c') or key == 27:  # 'c' or ESC key
+                    break
+                
+                # Check if window was closed
+                try:
+                    if cv2.getWindowProperty("Books4Geeks Barcode Scanner", cv2.WND_PROP_VISIBLE) < 1:
+                        break
+                except cv2.error:
+                    # Window property check failed, continue without it
+                    pass
+                    
+            except cv2.error as cv_error:
+                # GUI display not available (common in Windows/virtual environments)
+                print(f"OpenCV GUI Error: {cv_error}")
+                print("GUI display not available. Running in headless mode.")
+                print("Scanner will process 30 frames and then stop.")
+                
+                # Process a limited number of frames without display
+                import time
+                time.sleep(0.1)  # Small delay to simulate real-time scanning
+                
+                # Counter to limit frames in headless mode
+                if not hasattr(scan_barcode_desktop, 'headless_frame_count'):
+                    scan_barcode_desktop.headless_frame_count = 0
+                scan_barcode_desktop.headless_frame_count += 1
+                
+                # Stop after 30 frames in headless mode
+                if scan_barcode_desktop.headless_frame_count >= 30:
+                    print("Headless mode: Processed 30 frames, stopping scanner.")
+                    break
+          # Clean up
         cap.release()
-        cv2.destroyAllWindows()
+        try:
+            cv2.destroyAllWindows()
+        except cv2.error:
+            # Error destroying windows (common in headless mode)
+            pass
+        
+        # Reset headless frame counter for next use
+        if hasattr(scan_barcode_desktop, 'headless_frame_count'):
+            delattr(scan_barcode_desktop, 'headless_frame_count')
           # Store scanned books in session
         if scanned_books:
             request.session['desktop_scanned_books'] = scanned_books
