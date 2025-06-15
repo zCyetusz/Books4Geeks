@@ -1,0 +1,55 @@
+{% load static %}
+<!-- Analytics Summary Widget -->
+<div class="card bg-gradient-info">
+  <div class="card-header border-0">
+    <h3 class="card-title text-white">
+      <i class="fas fa-chart-pie mr-2"></i>
+      Quick Analytics
+    </h3>
+    <div class="card-tools">
+      <a href="{% url 'inventory_analytics' %}" class="btn btn-light btn-sm">
+        <i class="fas fa-external-link-alt"></i> Full Analytics
+      </a>
+    </div>
+  </div>
+  <div class="card-body text-white">
+    <div class="row">
+      <div class="col-6 text-center">
+        <h4 class="mb-1">{{ total_books|default:0 }}</h4>
+        <small>Total Books</small>
+      </div>
+      <div class="col-6 text-center">
+        <h4 class="mb-1 text-warning">{{ critical_alerts|default:0 }}</h4>
+        <small>Critical Alerts</small>
+      </div>
+    </div>
+    <div class="row mt-3">
+      <div class="col-6 text-center">
+        <h4 class="mb-1">{{ high_alerts|default:0 }}</h4>
+        <small>High Priority</small>
+      </div>
+      <div class="col-6 text-center">
+        <h4 class="mb-1 text-success">${{ total_value|default:0|floatformat:0 }}</h4>
+        <small>Inventory Value</small>
+      </div>
+    </div>
+    
+    {% if critical_alerts > 0 %}
+    <div class="mt-3">
+      <div class="alert alert-warning alert-sm mb-0" style="background: rgba(255,255,255,0.2); border: none;">
+        <small>
+          <i class="fas fa-exclamation-triangle mr-1"></i>
+          {{ critical_alerts }} book{{ critical_alerts|pluralize }} need immediate attention
+        </small>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.alert-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+}
+</style>

@@ -4,7 +4,7 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     # Pages
-    path('', views.index),
+    path('', views.index, name='index'),  # Add missing index name
     path('dashboard/', views.index, name='dashboard'),  # Add missing dashboard URL
     path('dashboard-v2/', views.index2, name='dashboardv2'),
     path('dashboard-v3/', views.index3, name='dashboardv3'),
@@ -123,11 +123,11 @@ urlpatterns = [
     path('roles/assign/<int:user_id>/', views.assign_user_roles, name='assign_user_roles_to_user'),
     
     # Reports and Analytics
-    path('reports/', views.reports, name='reports'),
-    
-    # Smart Inventory Management
+    path('reports/', views.reports, name='reports'),    # Smart Inventory Management
     path('inventory/alerts/', views.inventory_alerts, name='inventory_alerts'),
     path('inventory/analytics/', views.inventory_analytics, name='inventory_analytics'),
+    # path('inventory/analytics/export/', views.analytics_report_export, name='analytics_export'),
+    # path('inventory/analytics/widget/', views.analytics_dashboard_widget, name='analytics_widget'),
     path('inventory/purchase-order/', views.generate_purchase_order, name='generate_purchase_order'),
     path('api/inventory/alerts/', views.inventory_api_alerts, name='inventory_api_alerts'),
     path('api/book-velocity/<int:book_id>/', views.book_velocity_analysis, name='book_velocity_analysis'),
