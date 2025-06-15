@@ -83,31 +83,28 @@
       </p>
     </a>
     <ul class="nav nav-treeview">
-      <li class="nav-item">
-        <a
+      <li class="nav-item">        <a
           href="/"
           class="nav-link {% if 'dashboardv1' in segment %} active {% endif %}"
         >
           <i class="far fa-circle nav-icon"></i>
-          <p>Dashboard v1</p>
+          <p>Bảng Điều Khiển v1</p>
         </a>
       </li>
-      <li class="nav-item">
-        <a
+      <li class="nav-item">        <a
           href="{% url 'dashboardv2' %}"
           class="nav-link {% if 'dashboardv2' in segment %} active {% endif %}"
         >
           <i class="far fa-circle nav-icon"></i>
-          <p>Dashboard v2</p>
+          <p>Bảng Điều Khiển v2</p>
         </a>
       </li>
-      <li class="nav-item">
-        <a
+      <li class="nav-item">        <a
           href="{% url 'dashboardv3' %}"
           class="nav-link {% if 'dashboardv3' in segment %} active {% endif %}"
         >
           <i class="far fa-circle nav-icon"></i>
-          <p>Dashboard v3</p>
+          <p>Bảng Điều Khiển v3</p>
         </a>
       </li>
     </ul>
@@ -119,18 +116,16 @@
       href="{% url 'widgets' %}"
       class="nav-link {% if 'widgets' in segment %}active{% endif %}"
     >
-      <i class="nav-icon fas fa-th"></i>
-      <p>
-        Widgets
-        <span class="right badge badge-danger">New</span>
+      <i class="nav-icon fas fa-th"></i>      <p>
+        Tiện ích
+        <span class="right badge badge-danger">Mới</span>
       </p>
     </a>
   </li>
   <li class="nav-item {% if 'layout' in parent %} menu-open {% endif %}">
     <a href="#" class="nav-link {% if 'layout' in parent %}active{% endif %}">
-      <i class="nav-icon fas fa-copy"></i>
-      <p>
-        Layout Options
+      <i class="nav-icon fas fa-copy"></i>      <p>
+        Tùy Chọn Giao Diện
         <i class="fas fa-angle-left right"></i>
         <span class="badge badge-info right">6</span>
       </p>
@@ -898,13 +893,13 @@
       <li class="nav-item">
         <a href="{% url 'author_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Authors</p>
+          <p>Tác Giả</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'book_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Books</p>
+          <p>Sách</p>
         </a>
       </li>
     </ul>
@@ -912,9 +907,8 @@
   <!-- Book Management Section -->
   <li class="nav-item">
     <a href="#" class="nav-link">
-      <i class="nav-icon fas fa-book"></i>
-      <p>
-        BookShelves
+      <i class="nav-icon fas fa-book"></i>      <p>
+        Kệ Sách
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -922,19 +916,19 @@
       <li class="nav-item">
         <a href="{% url 'area_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Areas</p>
+          <p>Khu Vực</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'shelf_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Shelves</p>
+          <p>Kệ</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'bookshelf_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Assign Book to Shelves</p>
+          <p>Phân Bổ Sách Vào Kệ</p>
         </a>
       </li>
     </ul>
@@ -943,26 +937,24 @@
   <!-- Smart Inventory Management -->
   <li class="nav-item {% if 'inventory' in parent %} menu-open {% endif %}">
     <a href="#" class="nav-link {% if 'inventory' in parent %} active {% endif %}">
-      <i class="nav-icon fas fa-brain"></i>
-      <p>
-        Smart Inventory
+      <i class="nav-icon fas fa-brain"></i>      <p>
+        Quản Lý Thông Minh
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
     <ul class="nav nav-treeview">
       <li class="nav-item">
         <a href="{% url 'inventory_alerts' %}" class="nav-link {% if 'alerts' in segment %} active {% endif %}">
-          <i class="far fa-bell nav-icon"></i>
-          <p>
-            Restock Alerts
-            <span class="badge badge-danger right" id="alertsBadge">New</span>
+          <i class="far fa-bell nav-icon"></i>          <p>
+            Cảnh Báo Nhập Hàng
+            <span class="badge badge-danger right" id="alertsBadge">Mới</span>
           </p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'inventory_analytics' %}" class="nav-link {% if 'analytics' in segment %} active {% endif %}">
           <i class="far fa-chart-line nav-icon"></i>
-          <p>Analytics & Insights</p>
+          <p>Phân Tích & Thống Kê</p>
         </a>
       </li>
     </ul>  </li>
@@ -970,9 +962,8 @@
   <!-- AI Image Recognition -->
   <li class="nav-item {% if 'ai_recognition' in parent %} menu-open {% endif %}">
     <a href="#" class="nav-link {% if 'ai_recognition' in parent %} active {% endif %}">
-      <i class="nav-icon fas fa-camera-retro"></i>
-      <p>
-        AI Recognition
+      <i class="nav-icon fas fa-camera-retro"></i>      <p>
+        Nhận Diện AI
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -980,37 +971,37 @@
       <li class="nav-item">
         <a href="{% url 'ai_image_recognition_dashboard' %}" class="nav-link {% if 'ai_image_recognition_dashboard' in segment %} active {% endif %}">
           <i class="far fa-tachometer-alt nav-icon"></i>
-          <p>AI Dashboard</p>
+          <p>Bảng Điều Khiển AI</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'book_cover_analyzer' %}" class="nav-link {% if 'book_cover_analyzer' in segment %} active {% endif %}">
           <i class="far fa-image nav-icon"></i>
-          <p>Cover Analyzer</p>
+          <p>Phân Tích Bìa Sách</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'inventory_counter' %}" class="nav-link {% if 'inventory_counter' in segment %} active {% endif %}">
           <i class="far fa-calculator nav-icon"></i>
-          <p>Smart Counting</p>
+          <p>Đếm Thông Minh</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'damage_assessor' %}" class="nav-link {% if 'damage_assessor' in segment %} active {% endif %}">
           <i class="far fa-search nav-icon"></i>
-          <p>Damage Assessor</p>
+          <p>Đánh Giá Hư Hỏng</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'auto_categorizer' %}" class="nav-link {% if 'auto_categorizer' in segment %} active {% endif %}">
           <i class="far fa-tags nav-icon"></i>
-          <p>Auto-Categorizer</p>
+          <p>Phân Loại Tự Động</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'ai_analysis_report' %}" class="nav-link {% if 'ai_analysis_report' in segment %} active {% endif %}">
           <i class="far fa-chart-bar nav-icon"></i>
-          <p>Analysis Reports</p>
+          <p>Báo Cáo Phân Tích</p>
         </a>
       </li>
     </ul>
@@ -1019,9 +1010,8 @@
   <!-- Bills -->
   <li class="nav-item">
     <a href="#" class="nav-link">
-      <i class="nav-icon fas fa-file-invoice-dollar"></i>
-      <p>
-        Bills
+      <i class="nav-icon fas fa-file-invoice-dollar"></i>      <p>
+        Hóa Đơn
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -1029,19 +1019,19 @@
       <li class="nav-item">
         <a href="{% url 'bill_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Bill List</p>
+          <p>Danh Sách Hóa Đơn</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'bill_create' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Create Bill</p>
+          <p>Tạo Hóa Đơn</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'bill_scan_barcode' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Scan Barcode</p>
+          <p>Quét Mã Vạch</p>
         </a>
       </li>
     </ul>
@@ -1050,9 +1040,8 @@
   <!-- Role Management -->
   <li class="nav-item">
     <a href="#" class="nav-link">
-      <i class="nav-icon fas fa-user-tag"></i>
-      <p>
-        Role Management
+      <i class="nav-icon fas fa-user-tag"></i>      <p>
+        Quản Lý Vai Trò
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -1060,13 +1049,13 @@
       <li class="nav-item">
         <a href="{% url 'role_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Roles & Permissions</p>
+          <p>Vai Trò & Quyền Hạn</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'assign_user_roles' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Assign User Roles</p>
+          <p>Phân Quyền Người Dùng</p>
         </a>
       </li>
     </ul>
@@ -1075,9 +1064,8 @@
   <!-- Customers -->
   <li class="nav-item">
     <a href="#" class="nav-link">
-      <i class="nav-icon fas fa-users"></i>
-      <p>
-        Customers
+      <i class="nav-icon fas fa-users"></i>      <p>
+        Khách Hàng
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -1085,13 +1073,13 @@
       <li class="nav-item">
         <a href="{% url 'customer_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Customer List</p>
+          <p>Danh Sách Khách Hàng</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'customer_create' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Create Customer</p>
+          <p>Tạo Khách Hàng</p>
         </a>
       </li>
     </ul>
@@ -1100,9 +1088,8 @@
   <!-- Reservations -->
   <li class="nav-item">
     <a href="#" class="nav-link">
-      <i class="nav-icon fas fa-calendar-alt"></i>
-      <p>
-        Reservations
+      <i class="nav-icon fas fa-calendar-alt"></i>      <p>
+        Đặt Chỗ
         <i class="right fas fa-angle-left"></i>
       </p>
     </a>
@@ -1110,13 +1097,13 @@
       <li class="nav-item">
         <a href="{% url 'reservation_list' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Reservation List</p>
+          <p>Danh Sách Đặt Chỗ</p>
         </a>
       </li>
       <li class="nav-item">
         <a href="{% url 'reservation_create' %}" class="nav-link ajax-link">
           <i class="far fa-circle nav-icon"></i>
-          <p>Create Reservation</p>
+          <p>Tạo Đặt Chỗ</p>
         </a>
       </li>
     </ul>  </li>
@@ -1127,9 +1114,8 @@
       href="{% url 'advanced_search' %}"
       class="nav-link {% if 'search' in parent %} active {% endif %}"
     >
-      <i class="nav-icon fas fa-search"></i>
-      <p>
-        Advanced Search
+      <i class="nav-icon fas fa-search"></i>      <p>
+        Tìm Kiếm Nâng Cao
       </p>
     </a>
   </li>
@@ -1140,9 +1126,8 @@
       href="{% url 'reports' %}"
       class="nav-link {% if 'reports' in parent %} active {% endif %}"
     >
-      <i class="nav-icon fas fa-chart-line"></i>
-      <p>
-        Reports & Analytics
+      <i class="nav-icon fas fa-chart-line"></i>      <p>
+        Báo Cáo & Thống Kê
       </p>
     </a>
   </li>
@@ -1150,20 +1135,20 @@
   <li class="nav-item">
     <a href="{% url 'logout' %}" class="nav-link direct-link">
       <i class="fa fa-sign-out-alt nav-icon"></i>
-      <p>Logout</p>
+      <p>Đăng Xuất</p>
     </a>
   </li>
   {% else %}
   <li class="nav-item">
     <a href="{% url 'login' %}" class="nav-link">
       <i class="fa fa-sign-in-alt nav-icon"></i>
-      <p>Login</p>
+      <p>Đăng Nhập</p>
     </a>
   </li>
   <li class="nav-item">
     <a href="{% url 'register' %}" class="nav-link">
       <i class="fa fa-user-plus nav-icon"></i>
-      <p>Register</p>
+      <p>Đăng Ký</p>
     </a>
   </li>
   {% endif %}
@@ -1172,7 +1157,7 @@
   <li class="nav-item mt-3">
     <a href="#" class="nav-link" id="chatbot-toggle">
       <i class="nav-icon fas fa-robot"></i>
-      <p>AI Assistant</p>
+      <p>Trợ Lý AI</p>
     </a>
   </li>
 </ul>
@@ -1180,7 +1165,7 @@
 <!-- Chatbot UI -->
 <div id="chatbot-container" class="chatbot-container" style="display: none">
   <div class="chatbot-header">
-    <h5>AI Assistant</h5>
+    <h5>Trợ Lý AI</h5>
     <button id="close-chatbot" class="close-chatbot">
       <i class="fas fa-times"></i>
     </button>
@@ -1188,7 +1173,7 @@
   <div class="chatbot-messages" id="chatbot-messages">
     <div class="message bot-message">
       <div class="message-content">
-        Hello! I'm your AI assistant. How can I help you today?
+        Xin chào! Tôi là trợ lý AI của bạn. Hôm nay tôi có thể giúp gì cho bạn?
       </div>
     </div>
     <!-- Database query suggestion buttons -->

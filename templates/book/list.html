@@ -1,18 +1,17 @@
-{% extends 'layouts/base.html' %} {% load static %} {% block title %} Book List
+{% extends 'layouts/base.html' %} {% load static %} {% block title %} Danh Sách Sách
 {% endblock title %} {% block content %}
 <!-- Content Wrapper. Contains page content -->
 <div class="content-wrapper">
   <!-- Content Header (Page header) -->
   <section class="content-header">
     <div class="container-fluid">
-      <div class="row mb-2">
-        <div class="col-sm-6">
-          <h1>Books</h1>
+      <div class="row mb-2">        <div class="col-sm-6">
+          <h1>Sách</h1>
         </div>
         <div class="col-sm-6">
           <ol class="breadcrumb float-sm-right">
-            <li class="breadcrumb-item"><a href="/">Home</a></li>
-            <li class="breadcrumb-item active">Books</li>
+            <li class="breadcrumb-item"><a href="/">Trang Chủ</a></li>
+            <li class="breadcrumb-item active">Sách</li>
           </ol>
         </div>
       </div>
@@ -25,29 +24,27 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-12">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Book List</h3>
+          <div class="card">            <div class="card-header">
+              <h3 class="card-title">Danh Sách Sách</h3>
               <div class="card-tools">
                 <a
                   href="{% url 'book_create' %}"
                   class="btn btn-primary btn-sm"
                 >
-                  <i class="fas fa-plus"></i> Add Book
+                  <i class="fas fa-plus"></i> Thêm Sách
                 </a>
               </div>
             </div>
             <!-- /.card-header -->
             <div class="card-body">
               <table id="example1" class="table table-bordered table-striped">
-                <thead>
-                  <tr>
+                <thead>                  <tr>
                     <th>ID</th>
-                    <th>BookName</th>
-                    <th>Description</th>
-                    <th>Price</th>
-                    <th>Publisher</th>
-                    <th>Authors</th>
+                    <th>Tên Sách</th>
+                    <th>Mô Tả</th>
+                    <th>Giá</th>
+                    <th>Nhà Xuất Bản</th>
+                    <th>Tác Giả</th>
                     <th>Categories</th>
                     <th>Publish Date</th>
                     <th>Barcode</th>
